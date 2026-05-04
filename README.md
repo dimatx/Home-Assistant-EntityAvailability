@@ -258,8 +258,7 @@ automation:
   - alias: "Low battery alert"
     trigger:
       - platform: numeric_state
-        entity_id: sensor.entity_availability_security_devices_group_summary
-        attribute: low_battery
+        entity_id: sensor.entity_availability_security_devices_low_battery_count
         above: 0
     action:
       - service: notify.mobile_app
