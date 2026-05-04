@@ -55,6 +55,8 @@ This integration uses a config flow accessible from **Settings > Devices & Servi
 | Group Name | A descriptive name for this group (e.g., "Security Cameras") |
 | Entities to Monitor | Select the entities you want to track |
 
+![Step 1: Create Entity Group](custom_components/entity_availability/docs/01_create_entity_group.png)
+
 ### Step 2: Monitoring Settings
 
 | Field | Default | Description |
@@ -63,12 +65,16 @@ This integration uses a config flow accessible from **Settings > Devices & Servi
 | Cooldown (seconds) | `60` | Time to wait before confirming an entity is offline |
 | Staleness threshold (minutes) | `0` (disabled) | Mark entity degraded if no state change in this time |
 
+![Step 2: Monitoring Settings](custom_components/entity_availability/docs/02_monitoring_settings.png)
+
 ### Step 3: Advanced Settings
 
 | Field | Default | Description |
 |-------|---------|-------------|
 | Low battery threshold (%) | `20` | Battery level below which an entity is considered degraded (0 = disabled) |
 | Availability tracking windows | `today`, `7d` | Which time windows to create availability sensors for |
+
+![Step 3: Advanced Settings](custom_components/entity_availability/docs/03_advanced_settings.png)
 
 ### Step 4: Battery Entity Mapping (when battery threshold > 0)
 
@@ -83,6 +89,8 @@ Auto-detection strategies:
 2. Convention -- checks for `sensor.{entity_name}_battery`
 
 Battery sensors that report `low` (text) are supported in addition to numeric percentages.
+
+![Step 4: Battery Entity Mapping](custom_components/entity_availability/docs/04_battery_entity_mapping.png)
 
 ### Options Flow
 
@@ -109,6 +117,8 @@ For example, a group named "Security Devices" produces the slug `security_device
 
 > **Note:** The Low Battery and Low Battery Count sensors are only created when battery threshold > 0. Availability window sensors are only created for windows selected during configuration.
 
+![Sensors](custom_components/entity_availability/docs/05_sensors.png)
+
 ### Group Summary Sensor
 
 The Group Summary sensor provides a complete overview in its attributes:
@@ -121,6 +131,8 @@ The Group Summary sensor provides a complete overview in its attributes:
 | `suppressed` | Number of suppressed entities |
 | `battery_powered` | Number of entities with a mapped battery sensor |
 | `low_battery` | Number of entities with battery below threshold |
+| `entities` | List of all monitored entity IDs in this group |
+| `battery_levels` | Dict of `{entity_id: battery_level}` for entities with battery sensors |
 
 Access these in templates:
 
@@ -128,6 +140,8 @@ Access these in templates:
 {{ state_attr('sensor.entity_availability_security_devices_group_summary', 'battery_powered') }}
 {{ state_attr('sensor.entity_availability_security_devices_group_summary', 'offline') }}
 ```
+
+![Sensor Details & Attributes](custom_components/entity_availability/docs/06_sensor_details_attributes.png)
 
 ### Recovery Attributes
 
@@ -159,26 +173,49 @@ Availability is calculated using 5-minute time buckets (up to 7 days / 2016 buck
 
 ### `entity_availability.suppress`
 
-Temporarily exclude an entity from monitoring and offline alerts.
+Temporarily exclude an entity (or all entities in a group) from monitoring and offline alerts.
 
 ```yaml
+# Suppress a single entity
 service: entity_availability.suppress
 data:
   entity_id: switch.garden_lights
   duration: 120  # minutes (default: 60, max: 10080)
 ```
 
+```yaml
+# Suppress all entities in a group
+service: entity_availability.suppress
+data:
+  group: security_devices
+  duration: 60
+```
+
 **Use case:** Suppress monitoring during planned maintenance, firmware updates, or known downtime.
+
+![Suppress Entity Action](custom_components/entity_availability/docs/09_suppress_entity_action.png)
 
 ### `entity_availability.unsuppress`
 
-Resume monitoring for a previously suppressed entity.
+Resume monitoring for a previously suppressed entity or group.
 
 ```yaml
+# Unsuppress a single entity
 service: entity_availability.unsuppress
 data:
   entity_id: switch.garden_lights
 ```
+
+```yaml
+# Unsuppress all entities in a group
+service: entity_availability.unsuppress
+data:
+  group: security_devices
+```
+
+![Unsuppress Entity Action](custom_components/entity_availability/docs/10_unsuppress_entity_action.png)
+
+![Actions Overview](custom_components/entity_availability/docs/08_actions.png)
 
 ---
 
@@ -335,27 +372,31 @@ The `group` field should be the group slug (e.g., `security_devices`). The card 
 
 All options are configurable via the visual card editor UI.
 
+![Card Configuration](custom_components/entity_availability/docs/07_ui_card_configuration_screen.png)
+
 ### Card Preview
 
 ```
-┌─────────────────────────────────────────┐
-│ ✓ Security Devices              All OK  │
-├─────────────────────────────────────────┤
-│  Online: 5  │  Offline: 1  │  Low Battery: 1│
-├─────────────────────────────────────────┤
-│  Today    ████████████████████░░  98.2% │
-│  7 days   ███████████████████░░░  95.1% │
-├─────────────────────────────────────────┤
-│  ▾ Entities (6)                         │
-│    Entity          State       Bat.     │
-│    ─────────────────────────────────    │
-│    ● Camera 1      Online      100%    │
-│    ● Camera 2      Online       85%    │
-│    ▲ Door Lock     Low Battery  18%    │
-│    ✖ Sensor 3      Offline 12m         │
-│    ● Motion 1      Online              │
-│    ● Smart Plug    Online              │
-└─────────────────────────────────────────┘
+┌───────────────────────────────────────────────┐
+│ ✓ Security Devices                    All OK  │
+├───────────────────────────────────────────────┤
+│   Online: 5     Offline: 1     Low Battery: 1 │
+├───────────────────────────────────────────────┤
+│  Today   ██████████████████████░░░░   98.2%   │
+│  7 Days  ████████████████████░░░░░░   95.1%   │
+├───────────────────────────────────────────────┤
+│  ▾ Entities (6)                               │
+│    Entity            State          Bat.      │
+│    ───────────────────────────────────────    │
+│    ● Camera 1        Online         100%      │
+│    ● Camera 2        Online          85%      │
+│    ▲ Door Lock       Low Battery     18%      │
+│    ✖ Sensor 3        Offline 12m              │
+│    ● Motion 1        Online                   │
+│    ● Smart Plug      Online                   │
+├───────────────────────────────────────────────┤
+│       [Suppress All]   [Unsuppress All]       │
+└───────────────────────────────────────────────┘
 ```
 
 ---

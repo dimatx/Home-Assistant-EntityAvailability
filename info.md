@@ -7,14 +7,17 @@ Monitor entity availability across your Home Assistant setup. Track offline enti
 - Multi-group support — organize entities by function (Security, Climate, Media, etc.)
 - Configurable bad states — define which states count as offline (`unavailable`, `unknown`, or custom)
 - Cooldown timer — ignore brief blips before marking an entity offline
-- Availability % sensors — track uptime over today, 3-day, 5-day, and 7-day windows
+- Availability % sensors — track uptime over today, 3-day, 5-day, and 7-day windows (5-minute buckets)
 - Battery monitoring with entity mapping — auto-detects battery sensors, user confirms/overrides per entity
 - Low Battery Count sensor — numeric count for easy automation triggers
 - Battery entities that report `low` (text) are supported in addition to numeric percentages
 - Degraded entity detection — flag entities with low battery or stale data
-- Maintenance/suppression mode — temporarily exclude entities from monitoring
+- Group Summary sensor — total, online, offline, suppressed, battery_powered, low_battery counts + full entity list
+- Maintenance/suppression mode — suppress individual entities or entire groups
+- Any Offline binary sensor (Problem class) — triggers automations when entities go offline
 - Custom Lovelace card — dashboard-style display with status icon, stats, availability bars, entity list, and visual editor
 - Customizable availability bar colors and thresholds
+- Optional suppress/unsuppress action buttons in card
 - Survives HA restarts — history persisted via HA Store, no recorder dependency
 
 ## Setup

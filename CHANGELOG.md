@@ -24,6 +24,7 @@ All notable changes to this project will be documented in this file.
 - Low Battery Count sensor — numeric count for easy automation triggers
 - Options flow includes battery mapping step
 - Auto-detection of battery entities via device registry and naming convention
+- Suppress/unsuppress services support `group` parameter for group-level operations
 - Card: status icon (mdi:check-circle / alert-circle / close-circle) colored by group health
 - Card: stats row with Online / Offline / Low Battery counts
 - Card: all configured availability windows shown with colored progress bars
