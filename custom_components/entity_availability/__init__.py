@@ -52,83 +52,82 @@ async def _async_update_options(hass: HomeAssistant, entry: ConfigEntry) -> None
 
 async def _async_register_card(hass: HomeAssistant) -> None:
     """Register the custom Lovelace card as a static resource."""
-    # Only register once across multiple config entries
     if f"{DOMAIN}_card_registered" in hass.data:
         return
 
-    # Determine the path to the card JS file.
-    # Priority 1: shipped inside the integration directory (HACS compatible)
     card_path = Path(__file__).parent / "frontend" / "entity-availability-card.js"
 
     if not card_path.exists():
-        card_path = (
-            Path(__file__).resolve().parent.parent.parent
-            / "dist"
-            / "entity-availability-card.js"
-        )
-
-    if not card_path.exists():
-        card_path = (
-            Path(hass.config.path("www"))
-            / "community"
-            / DOMAIN
-            / "entity-availability-card.js"
-        )
-
-    if not card_path.exists():
-        card_path = Path(hass.config.path("www")) / "entity-availability-card.js"
-
-    if card_path.exists():
-        # Register a static path so HA serves the file
-        try:
-            hass.http.register_static_path(
-                LOVELACE_CARD_URL,
-                str(card_path.resolve()),
-                cache_headers=True,
-            )
-            _LOGGER.debug(
-                "Registered entity-availability-card.js at %s", LOVELACE_CARD_URL
-            )
-        except Exception:  # noqa: BLE001
-            _LOGGER.debug(
-                "Could not register static path for entity-availability-card.js"
-            )
-            return
-    else:
         _LOGGER.warning(
-            "Could not find entity-availability-card.js. "
-            "Expected at %s. Card will not be available in the dashboard.",
+            "Could not find entity-availability-card.js at %s. "
+            "Card will not be available in the dashboard.",
             card_path,
         )
         return
 
-    # Add the resource to Lovelace so the card is automatically loaded
     try:
-        # Access the lovelace resources collection (available when lovelace is in storage mode)
-        resources = hass.data.get("lovelace_resources")
-        if resources is not None:
-            # Check if already registered
-            existing = [
-                r
-                for r in resources.async_items()
-                if r.get("url", "").startswith(LOVELACE_CARD_URL)
-            ]
-            if not existing:
-                await resources.async_create_item(
-                    {"res_type": "module", "url": LOVELACE_CARD_URL}
+        hass.http.register_static_path(
+            LOVELACE_CARD_URL,
+            str(card_path.resolve()),
+            cache_headers=False,
+        )
+        _LOGGER.debug("Registered entity-availability-card.js at %s", LOVELACE_CARD_URL)
+    except Exception:  # noqa: BLE001
+        _LOGGER.warning(
+            "Could not register static path for entity-availability-card.js"
+        )
+        return
+
+    # Add the resource to Lovelace
+    # Try the lovelace integration's resource collection
+    try:
+        from homeassistant.components.lovelace import (  # noqa: PLC0415
+            DOMAIN as LOVELACE_DOMAIN,
+        )
+
+        lovelace_info = hass.data.get(LOVELACE_DOMAIN)
+        if lovelace_info:
+            resources = None
+            # Storage mode: lovelace_info has a resources attribute
+            if hasattr(lovelace_info, "resources"):
+                resources = lovelace_info.resources
+            # Alternative: dict-based storage
+            elif isinstance(lovelace_info, dict):
+                for dashboard in lovelace_info.values():
+                    if hasattr(dashboard, "resources"):
+                        resources = dashboard.resources
+                        break
+
+            if resources is None:
+                resources = hass.data.get("lovelace_resources")
+
+            if resources is not None:
+                existing = [
+                    r
+                    for r in resources.async_items()
+                    if LOVELACE_CARD_URL in r.get("url", "")
+                ]
+                if not existing:
+                    await resources.async_create_item(
+                        {"res_type": "module", "url": LOVELACE_CARD_URL}
+                    )
+                    _LOGGER.info("Added entity-availability-card as Lovelace resource")
+            else:
+                _LOGGER.info(
+                    "Lovelace resources not available. "
+                    "Add manually: url: %s, type: module",
+                    LOVELACE_CARD_URL,
                 )
-                _LOGGER.info("Added entity-availability-card as Lovelace resource")
         else:
-            _LOGGER.debug(
-                "Lovelace resources collection not available (YAML mode?). "
-                "Add the following to your Lovelace resources manually: %s",
+            _LOGGER.info(
+                "Lovelace not initialized. "
+                "Add resource manually: url: %s, type: module",
                 LOVELACE_CARD_URL,
             )
     except Exception:  # noqa: BLE001
-        _LOGGER.debug(
+        _LOGGER.info(
             "Could not auto-register Lovelace resource. "
-            "Add the following to your Lovelace resources manually: "
-            "url: %s, type: module",
+            "Add manually: url: %s, type: module",
             LOVELACE_CARD_URL,
         )
 
