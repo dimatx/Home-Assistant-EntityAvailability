@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [0.1.0] - 2026-05-04
 
 ### Changed
 - Renamed integration from "Device Availability" to "Entity Availability"
@@ -34,11 +34,6 @@ All notable changes to this project will be documented in this file.
 - Card: suppressed entities banner
 - Card: visual card editor with all options configurable
 - Integration icon (icon.png, icon@2x.png) for HACS display
-
-## [0.1.0] - 2024-12-01
-
-### Added
-- Initial release
 - Monitor entity availability with configurable groups
 - Track offline, degraded, and suppressed entity states
 - Availability tracking with configurable time windows (today, 3d, 5d, 7d)
