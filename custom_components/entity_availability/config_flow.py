@@ -194,18 +194,12 @@ class EntityAvailabilityConfigFlow(ConfigFlow, domain=DOMAIN):
             if detected:
                 schema_dict[vol.Optional(entity_id, default=detected)] = (
                     selector.EntitySelector(
-                        selector.EntitySelectorConfig(
-                            domain="sensor",
-                            device_class="battery",
-                        )
+                        selector.EntitySelectorConfig(domain="sensor")
                     )
                 )
             else:
                 schema_dict[vol.Optional(entity_id)] = selector.EntitySelector(
-                    selector.EntitySelectorConfig(
-                        domain="sensor",
-                        device_class="battery",
-                    )
+                    selector.EntitySelectorConfig(domain="sensor")
                 )
 
         return self.async_show_form(
@@ -361,18 +355,12 @@ class EntityAvailabilityOptionsFlow(OptionsFlow):
             if default:
                 schema_dict[vol.Optional(entity_id, default=default)] = (
                     selector.EntitySelector(
-                        selector.EntitySelectorConfig(
-                            domain="sensor",
-                            device_class="battery",
-                        )
+                        selector.EntitySelectorConfig(domain="sensor")
                     )
                 )
             else:
                 schema_dict[vol.Optional(entity_id)] = selector.EntitySelector(
-                    selector.EntitySelectorConfig(
-                        domain="sensor",
-                        device_class="battery",
-                    )
+                    selector.EntitySelectorConfig(domain="sensor")
                 )
 
         return self.async_show_form(
