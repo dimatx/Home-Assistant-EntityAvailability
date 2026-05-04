@@ -7,8 +7,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from homeassistant.const import STATE_ON, STATE_UNAVAILABLE
-from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.core import HomeAssistant
 
 from custom_components.entity_availability.const import DOMAIN
 from custom_components.entity_availability.coordinator import EntityAvailabilityCoordinator

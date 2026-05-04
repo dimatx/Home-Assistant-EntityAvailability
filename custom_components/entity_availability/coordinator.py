@@ -14,7 +14,7 @@ from homeassistant.helpers.event import (
 )
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.helpers.storage import Store
-from homeassistant.helpers import entity_registry as er, device_registry as dr
+from homeassistant.helpers import entity_registry as er
 
 from .const import (
     CONF_BAD_STATES,
@@ -27,7 +27,6 @@ from .const import (
     DEFAULT_BATTERY_THRESHOLD,
     DEFAULT_COOLDOWN,
     DEFAULT_STALENESS_THRESHOLD,
-    DOMAIN,
     SCAN_INTERVAL,
     STORAGE_KEY_PREFIX,
     STORAGE_VERSION,
@@ -340,7 +339,6 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
     def _get_battery_from_device_registry(self, entity_id: str) -> int | None:
         """Look up battery level via the device registry."""
         ent_reg = er.async_get(self.hass)
-        dev_reg = dr.async_get(self.hass)
 
         entry = ent_reg.async_get(entity_id)
         if not entry or not entry.device_id:

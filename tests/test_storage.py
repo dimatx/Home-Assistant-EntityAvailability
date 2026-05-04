@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from custom_components.entity_availability.const import BUCKET_INTERVAL, BUCKETS_MAX
-from custom_components.entity_availability.storage import AvailabilityBucket, AvailabilityStorage
+from custom_components.entity_availability.storage import AvailabilityStorage
 
 
 @pytest.fixture

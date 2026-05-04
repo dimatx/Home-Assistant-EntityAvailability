@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-import pytest
 
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
@@ -20,7 +19,6 @@ from custom_components.entity_availability.const import (
     CONF_STALENESS_THRESHOLD,
     DEFAULT_AVAILABILITY_WINDOWS,
     DEFAULT_BAD_STATES,
-    DEFAULT_BATTERY_THRESHOLD,
     DEFAULT_COOLDOWN,
     DEFAULT_STALENESS_THRESHOLD,
     DOMAIN,

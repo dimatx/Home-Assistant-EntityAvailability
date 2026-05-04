@@ -2,19 +2,13 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from homeassistant.const import STATE_ON, STATE_UNAVAILABLE
+from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
 
-from custom_components.entity_availability.const import (
-    CONF_AVAILABILITY_WINDOWS,
-    CONF_ENTITIES,
-    CONF_GROUP_NAME,
-    DOMAIN,
-)
 from custom_components.entity_availability.coordinator import EntityAvailabilityCoordinator
 from custom_components.entity_availability.models import DeviceState
 from custom_components.entity_availability.sensor import (
@@ -25,7 +19,6 @@ from custom_components.entity_availability.sensor import (
     OfflineCountSensor,
     OfflineDevicesSensor,
 )
-from custom_components.entity_availability.storage import AvailabilityStorage
 
 
 @pytest.fixture

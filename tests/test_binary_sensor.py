@@ -1,12 +1,10 @@
 """Tests for Entity Availability binary sensor."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from homeassistant.const import STATE_ON
 from homeassistant.core import HomeAssistant
 
 from custom_components.entity_availability.binary_sensor import AnyOfflineBinarySensor

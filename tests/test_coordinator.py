@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -13,23 +12,15 @@ from homeassistant.core import HomeAssistant, State
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.entity_availability.const import (
-    CONF_AVAILABILITY_WINDOWS,
-    CONF_BAD_STATES,
-    CONF_BATTERY_THRESHOLD,
-    CONF_COOLDOWN,
     CONF_ENTITIES,
-    CONF_GROUP_NAME,
     CONF_STALENESS_THRESHOLD,
-    DEFAULT_AVAILABILITY_WINDOWS,
     DEFAULT_BAD_STATES,
     DEFAULT_BATTERY_THRESHOLD,
     DEFAULT_COOLDOWN,
     DEFAULT_STALENESS_THRESHOLD,
     DOMAIN,
-    SCAN_INTERVAL,
 )
 from custom_components.entity_availability.coordinator import EntityAvailabilityCoordinator
-from custom_components.entity_availability.models import DeviceState
 
 
 @pytest.fixture
@@ -75,7 +66,7 @@ async def test_state_change_online_device(
     ):
         coord = EntityAvailabilityCoordinator(hass, mock_config_entry)
         coord._last_update = None
-        data = await coord._async_update_data()
+        await coord._async_update_data()
 
     # All devices are STATE_ON, so none should be offline
     for entity_id, device in coord.device_states.items():
@@ -429,8 +420,6 @@ async def test_battery_detection_from_device_registry(
     ), patch(
         "custom_components.entity_availability.coordinator.er.async_get"
     ) as mock_er, patch(
-        "custom_components.entity_availability.coordinator.dr.async_get"
-    ), patch(
         "custom_components.entity_availability.coordinator.er.async_entries_for_device"
     ) as mock_entries:
         mock_ent_reg = MagicMock()
