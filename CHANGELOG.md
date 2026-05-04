@@ -11,12 +11,16 @@ All notable changes to this project will be documented in this file.
 - Battery monitoring requires explicit entity mapping via config flow step
 - Low Battery sensor only created when battery threshold > 0
 - Removed "All OK" binary sensor (redundant with "Any Offline")
+- Battery entity selector shows all sensors (not filtered by device_class)
+- Battery mapping uses suggested values — user can clear selections for non-battery entities
+- Low Battery and Offline Entities sensors show "None" state when no issues (not empty/unknown)
 
 ### Added
 - Battery entity mapping step in config flow — auto-detects and lets user confirm/override
 - Support for text battery states (`low`) in addition to numeric percentages
 - "Any Offline" binary sensor (Problem device class) — ON when any entity is offline
 - Group Summary sensor with total_entities, online, offline, suppressed, battery_powered, low_battery attributes
+- Low Battery Count sensor — numeric count for easy automation triggers
 - Options flow includes battery mapping step
 - Auto-detection of battery entities via device registry and naming convention
 

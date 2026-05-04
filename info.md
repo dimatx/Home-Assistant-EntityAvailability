@@ -8,7 +8,9 @@ Monitor entity availability across your Home Assistant setup. Track offline enti
 - Configurable bad states — define which states count as offline (`unavailable`, `unknown`, or custom)
 - Cooldown timer — ignore brief blips before marking an entity offline
 - Availability % sensors — track uptime over today, 3-day, 5-day, and 7-day windows
-- Battery monitoring with manual mapping — supports numeric (%) and text states (`low`)
+- Battery monitoring with entity mapping — auto-detects battery sensors, user confirms/overrides per entity
+- Low Battery Count sensor — numeric count for easy automation triggers
+- Battery entities that report `low` (text) are supported in addition to numeric percentages
 - Degraded entity detection — flag entities with low battery or stale data
 - Maintenance/suppression mode — temporarily exclude entities from monitoring
 - Custom Lovelace card — traffic-light status display with at-a-glance health overview

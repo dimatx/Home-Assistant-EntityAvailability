@@ -437,3 +437,55 @@ async def test_battery_detection_from_device_registry(
 
     device_a = coord.device_states["binary_sensor.device_a"]
     assert device_a.battery_level == 42
+
+
+class TestParseBatteryState:
+    """Tests for _parse_battery_state static method."""
+
+    def test_numeric_string(self):
+        """Test numeric string returns int."""
+        assert EntityAvailabilityCoordinator._parse_battery_state("85") == 85
+
+    def test_float_string(self):
+        """Test float string returns int."""
+        assert EntityAvailabilityCoordinator._parse_battery_state("42.7") == 42
+
+    def test_low_string(self):
+        """Test 'low' returns 0."""
+        assert EntityAvailabilityCoordinator._parse_battery_state("low") == 0
+
+    def test_low_uppercase(self):
+        """Test 'Low' returns 0."""
+        assert EntityAvailabilityCoordinator._parse_battery_state("Low") == 0
+
+    def test_invalid_string(self):
+        """Test invalid string returns None."""
+        assert EntityAvailabilityCoordinator._parse_battery_state("full") is None
+
+    def test_empty_string(self):
+        """Test empty string returns None."""
+        assert EntityAvailabilityCoordinator._parse_battery_state("") is None
+
+
+async def test_battery_low_text_state(
+    mock_hass: HomeAssistant, mock_config_entry
+) -> None:
+    """Test battery entity with 'low' text state is treated as 0."""
+    hass = mock_hass
+    hass.states.async_set(
+        "binary_sensor.device_a",
+        STATE_ON,
+        {"friendly_name": "Device A"},
+    )
+    hass.states.async_set("sensor.device_a_battery", "low")
+
+    with patch.object(
+        EntityAvailabilityCoordinator, "_async_save_storage", new_callable=AsyncMock
+    ):
+        coord = EntityAvailabilityCoordinator(hass, mock_config_entry)
+        coord._last_update = None
+        await coord._async_update_data()
+
+    device_a = coord.device_states["binary_sensor.device_a"]
+    assert device_a.battery_level == 0
+    assert device_a.is_degraded is True

@@ -75,6 +75,9 @@
       "low_battery": {
         "name": "Low Battery"
       },
+      "low_battery_count": {
+        "name": "Low Battery Count"
+      },
       "group_summary": {
         "name": "Group Summary"
       },

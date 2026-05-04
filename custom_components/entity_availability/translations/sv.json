@@ -69,6 +69,7 @@
       "offline_count": { "name": "Antal offline" },
       "offline_entities": { "name": "Offline-entiteter" },
       "low_battery": { "name": "Lågt batteri" },
+      "low_battery_count": { "name": "Antal lågt batteri" },
       "group_summary": { "name": "Gruppsammanfattning" },
       "availability_today": { "name": "Tillgänglighet (idag)" },
       "availability_3d": { "name": "Tillgänglighet (3 dagar)" },

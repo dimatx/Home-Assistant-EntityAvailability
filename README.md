@@ -99,14 +99,15 @@ For example, a group named "Security Devices" produces the slug `security_device
 | Entity | Type | State | Attributes |
 |--------|------|-------|------------|
 | `sensor..._offline_count` | Sensor | Number of entities currently offline | Per-entity offline status, timestamps, recovery info |
-| `sensor..._offline_entities` | Sensor | Comma-separated list of offline entity names | Full entity list, count |
-| `sensor..._low_battery` | Sensor | Comma-separated list of low battery entities | Per-entity battery levels, count |
+| `sensor..._offline_entities` | Sensor | Comma-separated list of offline entity names (`"None"` when all online) | Full entity list, count |
+| `sensor..._low_battery` | Sensor | Comma-separated list of low battery entities (`"None"` when all OK) | Per-entity battery levels, count |
+| `sensor..._low_battery_count` | Sensor | Number of entities with low battery | — |
 | `sensor..._group_summary` | Sensor | Total entity count in the group | total_entities, online, offline, suppressed, battery_powered, low_battery |
 | `sensor..._availability_today` | Sensor | Group availability % for today | Per-entity availability breakdown |
 | `sensor..._availability_7d` | Sensor | Group availability % over 7 days | Per-entity availability breakdown |
 | `binary_sensor..._any_offline` | Binary Sensor (Problem) | ON when at least one entity is offline | offline_entities, offline_count |
 
-> **Note:** The Low Battery sensor is only created when battery threshold > 0. Availability window sensors are only created for windows selected during configuration.
+> **Note:** The Low Battery and Low Battery Count sensors are only created when battery threshold > 0. Availability window sensors are only created for windows selected during configuration.
 
 ### Group Summary Sensor
 

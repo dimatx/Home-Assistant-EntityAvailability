@@ -69,6 +69,7 @@
       "offline_count": { "name": "Nombre hors ligne" },
       "offline_entities": { "name": "Entités hors ligne" },
       "low_battery": { "name": "Batterie faible" },
+      "low_battery_count": { "name": "Nombre batteries faibles" },
       "group_summary": { "name": "Résumé du groupe" },
       "availability_today": { "name": "Disponibilité (Aujourd'hui)" },
       "availability_3d": { "name": "Disponibilité (3 jours)" },

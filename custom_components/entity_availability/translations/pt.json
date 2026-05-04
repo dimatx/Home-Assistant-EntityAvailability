@@ -69,6 +69,7 @@
       "offline_count": { "name": "Contagem Offline" },
       "offline_entities": { "name": "Entidades Offline" },
       "low_battery": { "name": "Bateria Fraca" },
+      "low_battery_count": { "name": "Contagem bateria fraca" },
       "group_summary": { "name": "Resumo do Grupo" },
       "availability_today": { "name": "Disponibilidade (Hoje)" },
       "availability_3d": { "name": "Disponibilidade (3 Dias)" },

@@ -69,6 +69,7 @@
       "offline_count": { "name": "Conteggio offline" },
       "offline_entities": { "name": "Entità offline" },
       "low_battery": { "name": "Batteria scarica" },
+      "low_battery_count": { "name": "Conteggio batteria scarica" },
       "group_summary": { "name": "Riepilogo gruppo" },
       "availability_today": { "name": "Disponibilità (oggi)" },
       "availability_3d": { "name": "Disponibilità (3 giorni)" },

@@ -69,6 +69,7 @@
       "offline_count": { "name": "Aantal offline" },
       "offline_entities": { "name": "Offline entiteiten" },
       "low_battery": { "name": "Lage batterij" },
+      "low_battery_count": { "name": "Aantal lage batterij" },
       "group_summary": { "name": "Groepsoverzicht" },
       "availability_today": { "name": "Beschikbaarheid (vandaag)" },
       "availability_3d": { "name": "Beschikbaarheid (3 dagen)" },

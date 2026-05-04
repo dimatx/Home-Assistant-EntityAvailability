@@ -18,6 +18,7 @@ from custom_components.entity_availability.sensor import (
     AvailabilitySensor,
     DegradedDevicesSensor,
     GroupSummarySensor,
+    LowBatteryCountSensor,
     MAX_STATE_LENGTH,
     OfflineCountSensor,
     OfflineDevicesSensor,
@@ -233,6 +234,58 @@ class TestDegradedDevicesSensor:
         assert "count" in attrs
         assert attrs["count"] == 1
         assert attrs["devices"]["binary_sensor.device_a"] == "15%"
+
+
+class TestLowBatteryCountSensor:
+    """Tests for LowBatteryCountSensor."""
+
+    def test_native_value_zero_when_none_degraded(self, mock_coordinator, mock_hass):
+        """Test count is 0 when no devices have low battery."""
+        sensor = LowBatteryCountSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
+        sensor.hass = mock_hass
+        assert sensor.native_value == 0
+
+    def test_native_value_counts_low_battery(self, mock_coordinator, mock_hass):
+        """Test count reflects low battery devices."""
+        mock_coordinator._device_states["binary_sensor.device_a"].is_degraded = True
+        mock_coordinator._device_states["binary_sensor.device_a"].battery_level = 10
+        mock_coordinator._device_states["binary_sensor.device_b"].is_degraded = True
+        mock_coordinator._device_states["binary_sensor.device_b"].battery_level = 5
+        sensor = LowBatteryCountSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
+        sensor.hass = mock_hass
+        assert sensor.native_value == 2
+
+    def test_excludes_suppressed(self, mock_coordinator, mock_hass):
+        """Test suppressed devices are excluded from count."""
+        mock_coordinator._device_states["binary_sensor.device_a"].is_degraded = True
+        mock_coordinator._device_states["binary_sensor.device_a"].battery_level = 10
+        mock_coordinator._device_states["binary_sensor.device_a"].is_suppressed = True
+        sensor = LowBatteryCountSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
+        sensor.hass = mock_hass
+        assert sensor.native_value == 0
+
+    def test_excludes_degraded_without_battery(self, mock_coordinator, mock_hass):
+        """Test degraded devices without battery_level are excluded."""
+        mock_coordinator._device_states["binary_sensor.device_a"].is_degraded = True
+        mock_coordinator._device_states["binary_sensor.device_a"].battery_level = None
+        sensor = LowBatteryCountSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
+        sensor.hass = mock_hass
+        assert sensor.native_value == 0
+
+    def test_unique_id(self, mock_coordinator, mock_hass):
+        """Test unique_id format."""
+        sensor = LowBatteryCountSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
+        assert sensor.unique_id == "test_entry_id_low_battery_count"
 
 
 class TestAvailabilitySensor:
