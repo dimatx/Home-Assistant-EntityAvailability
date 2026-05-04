@@ -201,7 +201,7 @@ class DegradedDevicesSensor(
         self._attr_device_info = _device_info(entry_id, group_slug, group_name)
 
     @property
-    def native_value(self) -> str | None:
+    def native_value(self) -> str:
         """Return comma-separated list of low battery device names."""
         low_bat = [
             self._format_device(d)
@@ -209,7 +209,7 @@ class DegradedDevicesSensor(
             if d.is_degraded and not d.is_suppressed and d.battery_level is not None
         ]
         if not low_bat:
-            return None
+            return "None"
         result = ", ".join(low_bat)
         if len(result) > MAX_STATE_LENGTH - 3:
             result = result[: MAX_STATE_LENGTH - 3] + "..."

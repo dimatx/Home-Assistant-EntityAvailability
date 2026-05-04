@@ -202,12 +202,12 @@ class TestDegradedDevicesSensor:
         assert "Device A (15%)" in sensor.native_value
 
     def test_native_value_empty_when_none_degraded(self, mock_coordinator, mock_hass):
-        """Test None when no devices degraded."""
+        """Test 'None' string when no devices degraded."""
         sensor = DegradedDevicesSensor(
             mock_coordinator, "Test Group", "test_group", "test_entry_id"
         )
         sensor.hass = mock_hass
-        assert sensor.native_value is None
+        assert sensor.native_value == "None"
 
     def test_excludes_suppressed_degraded(self, mock_coordinator, mock_hass):
         """Test suppressed degraded devices are excluded."""
@@ -218,7 +218,7 @@ class TestDegradedDevicesSensor:
             mock_coordinator, "Test Group", "test_group", "test_entry_id"
         )
         sensor.hass = mock_hass
-        assert sensor.native_value is None
+        assert sensor.native_value == "None"
 
     def test_extra_state_attributes_shows_battery(self, mock_coordinator, mock_hass):
         """Test that battery levels are reported in attributes."""
