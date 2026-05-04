@@ -297,7 +297,7 @@ The integration ships with a custom card for quick health visualization. It is a
 ### Manual Installation (if auto-registration fails)
 
 1. Add the resource in **Settings > Dashboards > Resources**:
-   - URL: `/local/community/entity_availability/entity-availability-card.js`
+   - URL: `/local/lovelace-entity_availability/entity-availability-card.js`
    - Type: JavaScript Module
 
 ### Configuration

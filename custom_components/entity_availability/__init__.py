@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import shutil
 from pathlib import Path
 
+from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
@@ -19,7 +21,15 @@ _LOGGER = logging.getLogger(__name__)
 PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BINARY_SENSOR]
 
 CARD_FILENAME = "entity-availability-card.js"
-CARD_URL = f"/local/community/{DOMAIN}/{CARD_FILENAME}"
+CARD_DIR = f"lovelace-{DOMAIN}"
+CARD_URL_BASE = f"/local/{CARD_DIR}/{CARD_FILENAME}"
+
+
+def _get_version() -> str:
+    """Get integration version from manifest."""
+    manifest = Path(__file__).parent / "manifest.json"
+    with manifest.open() as f:
+        return json.load(f).get("version", "0.0.0")
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
@@ -53,13 +63,13 @@ async def _async_update_options(hass: HomeAssistant, entry: ConfigEntry) -> None
 
 
 async def _async_install_card(hass: HomeAssistant) -> None:
-    """Copy card JS to www/community folder so it's served via /local/."""
+    """Install card JS to www/ and register as Lovelace resource."""
     source = Path(__file__).parent / "frontend" / CARD_FILENAME
     if not source.exists():
         _LOGGER.warning("Card JS not found at %s", source)
         return
 
-    www_dir = Path(hass.config.path("www")) / "community" / DOMAIN
+    www_dir = Path(hass.config.path("www")) / CARD_DIR
     dest = www_dir / CARD_FILENAME
 
     try:
@@ -71,7 +81,22 @@ async def _async_install_card(hass: HomeAssistant) -> None:
         _LOGGER.warning("Could not copy card JS to %s", dest)
         return
 
-    # Register as Lovelace resource
+    # Register static path so HA serves the file
+    try:
+        await hass.http.async_register_static_paths(
+            [StaticPathConfig(f"/{CARD_DIR}/{CARD_FILENAME}", str(dest), True)]
+        )
+    except Exception:  # noqa: BLE001
+        _LOGGER.debug("Static path registration skipped (may already exist)")
+
+    # Register as Lovelace resource with version for cache busting
+    version = _get_version()
+    card_url = f"{CARD_URL_BASE}?v={version}"
+    await _async_register_lovelace_resource(hass, card_url)
+
+
+async def _async_register_lovelace_resource(hass: HomeAssistant, url: str) -> None:
+    """Register card as Lovelace resource."""
     try:
         from homeassistant.components.lovelace import (  # noqa: PLC0415
             DOMAIN as LOVELACE_DOMAIN,
@@ -94,20 +119,24 @@ async def _async_install_card(hass: HomeAssistant) -> None:
             existing = [
                 r for r in resources.async_items() if CARD_FILENAME in r.get("url", "")
             ]
-            if not existing:
-                await resources.async_create_item(
-                    {"res_type": "module", "url": CARD_URL}
-                )
-                _LOGGER.info("Registered %s as Lovelace resource", CARD_URL)
+            if existing:
+                # Update version if changed
+                for r in existing:
+                    if r.get("url") != url:
+                        await resources.async_update_item(
+                            r["id"], {"res_type": "module", "url": url}
+                        )
+                        _LOGGER.info("Updated Lovelace resource to %s", url)
+            else:
+                await resources.async_create_item({"res_type": "module", "url": url})
+                _LOGGER.info("Registered %s as Lovelace resource", url)
         else:
-            _LOGGER.info(
-                "Add Lovelace resource manually: url: %s, type: module", CARD_URL
-            )
+            _LOGGER.info("Add Lovelace resource manually: url: %s, type: module", url)
     except Exception:  # noqa: BLE001
         _LOGGER.info(
             "Could not auto-register Lovelace resource. "
             "Add manually: url: %s, type: module",
-            CARD_URL,
+            url,
         )
 
 
