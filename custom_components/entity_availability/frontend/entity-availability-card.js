@@ -1,27 +1,64 @@
 /**
- * Entity Availability Card v1.0.0
+ * Entity Availability Card v0.1.0
  * Custom Lovelace card for the Home Assistant Entity Availability integration.
- *
- * This is a pre-built, self-contained version.
- * Home Assistant provides Lit on the frontend, so we use the globally available instance.
  */
 const LitElement = Object.getPrototypeOf(
-  customElements.get("ha-panel-lovelace") ??
-  customElements.get("hui-view") ??
-  customElements.get("home-assistant")
+  customElements.get("ha-panel-lovelace")
 );
-if (!LitElement) {
-  console.error("Entity Availability Card: Could not find LitElement base class");
-}
-const { html, css, nothing } = LitElement?.prototype?.constructor ?? {};
+const { html, nothing } = LitElement.prototype;
 
-const CARD_VERSION = "1.0.0";
+// Provide css tagged template - works whether or not HA exposes it on prototype
+const css = LitElement.prototype.css || (() => {
+  class CSSResult {
+    constructor(cssText) {
+      this.cssText = cssText;
+      this._styleSheet = null;
+    }
+    get styleSheet() {
+      if (this._styleSheet === null && window.CSSStyleSheet) {
+        try {
+          this._styleSheet = new CSSStyleSheet();
+          this._styleSheet.replaceSync(this.cssText);
+        } catch (e) {
+          this._styleSheet = null;
+        }
+      }
+      return this._styleSheet;
+    }
+    toString() { return this.cssText; }
+  }
+  return (strings, ...values) => new CSSResult(
+    strings.reduce((acc, str, i) => acc + str + (values[i] != null ? String(values[i]) : ""), "")
+  );
+})();
+
+const CARD_VERSION = "0.1.0";
 
 console.info(
-  `%c ENTITY-AVAILABILITY-CARD %c v${CARD_VERSION} `,
+  `%c ENTITY-AVAILABILITY-CARD %c v${CARD_VERSION} %c — github.com/italo-lombardi `,
   "color: white; background: #4caf50; font-weight: bold; padding: 2px 6px; border-radius: 3px 0 0 3px;",
-  "color: #4caf50; background: #e8f5e9; font-weight: bold; padding: 2px 6px; border-radius: 0 3px 3px 0;"
+  "color: #4caf50; background: #e8f5e9; font-weight: bold; padding: 2px 6px;",
+  "color: #9e9e9e; background: #e8f5e9; padding: 2px 6px; border-radius: 0 3px 3px 0;"
 );
+
+const AVAILABILITY_WINDOWS = [
+  { key: "today", label: "Today" },
+  { key: "3d", label: "3 Days" },
+  { key: "5d", label: "5 Days" },
+  { key: "7d", label: "7 Days" },
+];
+
+const STATUS_ICONS = {
+  green: "mdi:check-circle",
+  yellow: "mdi:alert-circle",
+  red: "mdi:close-circle",
+};
+
+const STATUS_COLORS = {
+  green: "#4caf50",
+  yellow: "#ff9800",
+  red: "#f44336",
+};
 
 const cardStyles = css`
   :host {
@@ -31,9 +68,7 @@ const cardStyles = css`
     --eac-text-primary: var(--primary-text-color, #212121);
     --eac-text-secondary: var(--secondary-text-color, #727272);
     --eac-divider: var(--divider-color, rgba(0, 0, 0, 0.12));
-    --eac-card-bg: var(--card-background-color, #fff);
     --eac-bar-bg: var(--disabled-color, #bdbdbd);
-    --eac-bar-fill: var(--eac-green);
   }
 
   ha-card {
@@ -45,12 +80,6 @@ const cardStyles = css`
     align-items: center;
     justify-content: space-between;
     padding: 16px 16px 12px;
-    cursor: pointer;
-    user-select: none;
-  }
-
-  .card-header:hover {
-    opacity: 0.87;
   }
 
   .header-left {
@@ -60,27 +89,9 @@ const cardStyles = css`
     min-width: 0;
   }
 
-  .status-indicator {
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
+  .header-icon {
+    --mdc-icon-size: 24px;
     flex-shrink: 0;
-    box-shadow: 0 0 4px rgba(0, 0, 0, 0.2);
-  }
-
-  .status-indicator.green {
-    background-color: var(--eac-green);
-    box-shadow: 0 0 6px var(--eac-green);
-  }
-
-  .status-indicator.yellow {
-    background-color: var(--eac-yellow);
-    box-shadow: 0 0 6px var(--eac-yellow);
-  }
-
-  .status-indicator.red {
-    background-color: var(--eac-red);
-    box-shadow: 0 0 6px var(--eac-red);
   }
 
   .group-title {
@@ -106,132 +117,253 @@ const cardStyles = css`
     margin: 0 16px;
   }
 
-  .device-list {
-    padding: 8px 16px;
-    overflow: hidden;
-    transition: max-height 0.3s ease, opacity 0.3s ease;
-  }
-
-  .device-list.collapsed {
-    max-height: 0;
-    opacity: 0;
-    padding: 0 16px;
-  }
-
-  .device-list.expanded {
-    max-height: 500px;
-    opacity: 1;
-  }
-
-  .device-item {
+  /* Stats Row */
+  .stats-row {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 6px 0;
-    gap: 8px;
+    padding: 10px 16px;
   }
 
-  .device-item-left {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 0;
+  .stat-item {
+    flex: 1;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 500;
   }
 
-  .device-icon {
-    font-size: 14px;
-    flex-shrink: 0;
+  .stat-item.online {
+    color: var(--eac-green);
   }
 
-  .device-name {
-    font-size: 14px;
-    color: var(--eac-text-primary);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  .stat-item.offline {
+    color: var(--eac-red);
   }
 
-  .device-reason {
+  .stat-item.battery {
+    color: var(--eac-yellow);
+  }
+
+  .stat-item.neutral {
+    color: var(--eac-text-secondary);
+  }
+
+  .suppressed-banner {
     font-size: 12px;
     color: var(--eac-text-secondary);
-    white-space: nowrap;
-    flex-shrink: 0;
+    font-style: italic;
+    text-align: center;
+    padding: 4px 16px 8px;
   }
 
+  /* Availability Section */
   .availability-section {
-    padding: 12px 16px;
+    padding: 10px 16px;
   }
 
-  .availability-text {
-    font-size: 14px;
+  .availability-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  .availability-row:last-child {
+    margin-bottom: 0;
+  }
+
+  .availability-label {
+    font-size: 13px;
     color: var(--eac-text-secondary);
-    margin-bottom: 6px;
+    min-width: 50px;
   }
 
-  .availability-value {
-    font-weight: 500;
-    color: var(--eac-text-primary);
-  }
-
-  .timeline-bar {
-    width: 100%;
+  .availability-bar {
+    flex: 1;
     height: 8px;
     border-radius: 4px;
     background-color: var(--eac-bar-bg);
     overflow: hidden;
-    margin-top: 4px;
   }
 
-  .timeline-fill {
+  .availability-fill {
     height: 100%;
     border-radius: 4px;
     transition: width 0.5s ease;
   }
 
-  .timeline-fill.green {
-    background-color: var(--eac-green);
+  .availability-value {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--eac-text-primary);
+    min-width: 45px;
+    text-align: right;
   }
 
-  .timeline-fill.yellow {
-    background-color: var(--eac-yellow);
+  /* Entity List */
+  .entity-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    cursor: pointer;
+    user-select: none;
   }
 
-  .timeline-fill.red {
-    background-color: var(--eac-red);
+  .entity-section-header:hover {
+    opacity: 0.8;
   }
 
+  .entity-section-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--eac-text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .chevron {
+    transition: transform 0.3s ease;
+    --mdc-icon-size: 18px;
+  }
+
+  .chevron.expanded {
+    transform: rotate(180deg);
+  }
+
+  .entity-list {
+    padding: 0 16px 12px;
+    overflow: hidden;
+    transition: max-height 0.3s ease, opacity 0.3s ease;
+  }
+
+  .entity-list.collapsed {
+    max-height: 0;
+    opacity: 0;
+    padding: 0 16px;
+  }
+
+  .entity-list.expanded {
+    max-height: 2000px;
+    opacity: 1;
+  }
+
+  .entity-legend {
+    display: flex;
+    align-items: center;
+    padding: 0 0 6px;
+    gap: 10px;
+    border-bottom: 1px solid var(--eac-divider);
+    margin-bottom: 4px;
+  }
+
+  .entity-legend-dot {
+    width: 10px;
+    flex-shrink: 0;
+  }
+
+  .entity-legend-name {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--eac-text-secondary);
+    flex: 1;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .entity-legend-status {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--eac-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+  }
+
+  .entity-legend-battery {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--eac-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    min-width: 35px;
+    text-align: right;
+  }
+
+  .entity-item {
+    display: flex;
+    align-items: center;
+    padding: 5px 0;
+    gap: 10px;
+  }
+
+  .entity-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .entity-dot.green { background-color: var(--eac-green); }
+  .entity-dot.red { background-color: var(--eac-red); }
+  .entity-dot.yellow { background-color: var(--eac-yellow); }
+
+  .entity-name {
+    font-size: 13px;
+    color: var(--eac-text-primary);
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .entity-status {
+    font-size: 12px;
+    color: var(--eac-text-secondary);
+    white-space: nowrap;
+  }
+
+  .entity-battery {
+    font-size: 12px;
+    color: var(--eac-text-secondary);
+    white-space: nowrap;
+    min-width: 35px;
+    text-align: right;
+  }
+
+  /* Actions */
   .actions-section {
     padding: 8px 16px 12px;
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
   }
 
-  .suppress-btn {
+  .action-btn {
     display: inline-flex;
     align-items: center;
     gap: 6px;
     padding: 6px 14px;
     border: none;
     border-radius: 4px;
-    background-color: var(--primary-color, #03a9f4);
-    color: var(--text-primary-color, #fff);
     font-size: 13px;
     font-weight: 500;
     cursor: pointer;
     transition: opacity 0.2s;
   }
 
-  .suppress-btn:hover {
-    opacity: 0.85;
+  .action-btn:hover { opacity: 0.85; }
+  .action-btn:active { opacity: 0.7; }
+
+  .action-btn.suppress {
+    background-color: var(--primary-color, #03a9f4);
+    color: var(--text-primary-color, #fff);
   }
 
-  .suppress-btn:active {
-    opacity: 0.7;
-  }
-
-  .no-issues {
-    padding: 8px 16px 12px;
-    font-size: 13px;
-    color: var(--eac-text-secondary);
-    font-style: italic;
+  .action-btn.unsuppress {
+    background-color: var(--secondary-background-color, #e0e0e0);
+    color: var(--primary-text-color, #212121);
   }
 
   .error-message {
@@ -240,21 +372,11 @@ const cardStyles = css`
     font-size: 14px;
   }
 
-  .compact .card-header {
-    padding: 12px 16px 8px;
-  }
-
-  .compact .device-item {
-    padding: 4px 0;
-  }
-
-  .compact .availability-section {
-    padding: 8px 16px;
-  }
-
-  .compact .actions-section {
-    padding: 4px 16px 8px;
-  }
+  .compact .card-header { padding: 12px 16px 8px; }
+  .compact .stats-row { padding: 6px 16px; }
+  .compact .availability-section { padding: 6px 16px; }
+  .compact .entity-section-header { padding: 6px 16px; }
+  .compact .actions-section { padding: 4px 16px 8px; }
 `;
 
 class EntityAvailabilityCard extends LitElement {
@@ -262,7 +384,7 @@ class EntityAvailabilityCard extends LitElement {
     return {
       hass: { attribute: false },
       _config: { state: true },
-      _expanded: { state: true },
+      _entitiesExpanded: { state: true },
     };
   }
 
@@ -274,11 +396,21 @@ class EntityAvailabilityCard extends LitElement {
     return document.createElement("entity-availability-card-editor");
   }
 
-  static getStubConfig() {
+  static getStubConfig(hass) {
+    const match = Object.keys(hass.states).find(
+      (id) =>
+        id.startsWith("sensor.entity_availability_") &&
+        id.endsWith("_offline_count")
+    );
+    const group = match
+      ? match.replace("sensor.entity_availability_", "").replace("_offline_count", "")
+      : "my_devices";
     return {
-      group: "my_devices",
-      show_timeline: true,
+      group,
       show_availability: true,
+      show_entities: true,
+      entities_expanded: false,
+      show_actions: false,
       compact: false,
     };
   }
@@ -286,7 +418,7 @@ class EntityAvailabilityCard extends LitElement {
   constructor() {
     super();
     this._config = {};
-    this._expanded = false;
+    this._entitiesExpanded = false;
   }
 
   setConfig(config) {
@@ -294,29 +426,29 @@ class EntityAvailabilityCard extends LitElement {
       throw new Error("You must define a 'group' in the card configuration.");
     }
     this._config = {
-      show_timeline: true,
       show_availability: true,
+      show_entities: true,
+      entities_expanded: false,
+      show_actions: false,
       compact: false,
-      availability_window: "7d",
       ...config,
     };
+    this._entitiesExpanded = this._config.entities_expanded;
   }
 
   getCardSize() {
-    return this._config && this._config.compact ? 2 : 4;
+    return this._config.compact ? 3 : 5;
   }
 
   shouldUpdate(changedProps) {
-    if (changedProps.has("_config")) return true;
+    if (changedProps.has("_config") || changedProps.has("_entitiesExpanded")) return true;
     if (!this.hass) return false;
 
-    const entities = this._getEntityIds();
     const oldHass = changedProps.get("hass");
     if (!oldHass) return true;
 
-    return Object.values(entities).some(
-      (entityId) => oldHass.states[entityId] !== this.hass.states[entityId]
-    );
+    const ids = this._getAllEntityIds();
+    return ids.some((id) => oldHass.states[id] !== this.hass.states[id]);
   }
 
   render() {
@@ -325,230 +457,233 @@ class EntityAvailabilityCard extends LitElement {
     }
 
     if (!this._config.group) {
-      return html`<ha-card><div class="error-message">No group configured. Please set 'group' in card configuration.</div></ha-card>`;
+      return html`<ha-card><div class="error-message">No group configured.</div></ha-card>`;
     }
 
-    const entities = this._getEntityIds();
-    const allOk = this._getEntity(entities.allOk);
-    const offlineCountEntity = this._getEntity(entities.offlineCount);
-    const offlineEntitiesEntity = this._getEntity(entities.offlineEntities);
-    const lowBatteryEntity = this._getEntity(entities.lowBattery);
-    const availabilityEntity = this._getAvailabilityEntity(entities);
+    const prefix = `entity_availability_${this._config.group}`;
+    const summary = this._getEntity(`sensor.${prefix}_group_summary`);
+    const offlineCountEntity = this._getEntity(`sensor.${prefix}_offline_count`);
 
-    if (!allOk && !offlineCountEntity && !offlineEntitiesEntity && !lowBatteryEntity) {
+    if (!summary && !offlineCountEntity) {
       return html`<ha-card>
         <div class="error-message">
           No entities found for group "${this._config.group}".
-          Expected entities like: sensor.entity_availability_${this._config.group}_offline_count
+          Expected: sensor.${prefix}_offline_count
         </div>
       </ha-card>`;
     }
 
-    const offlineCount = offlineCountEntity
-      ? parseInt(offlineCountEntity.state, 10) || 0
-      : 0;
-    const isAllOk = allOk ? allOk.state === "on" : offlineCount === 0;
+    const attrs = summary?.attributes || {};
+    const total = attrs.total_entities || 0;
+    const online = attrs.online || 0;
+    const offline = attrs.offline || 0;
+    const lowBattery = attrs.low_battery || 0;
+    const suppressed = attrs.suppressed || 0;
+    const entities = attrs.entities || [];
+    const batteryLevels = attrs.battery_levels || {};
 
-    const lowBatteryText = lowBatteryEntity ? lowBatteryEntity.state : "";
-    const hasLowBattery = lowBatteryText && lowBatteryText !== "" && lowBatteryText !== "unknown" && lowBatteryText !== "unavailable";
-
-    const statusColor =
-      offlineCount > 0 ? "red" : hasLowBattery ? "yellow" : "green";
-
-    let totalEntities = 0;
-    if (offlineEntitiesEntity && offlineEntitiesEntity.attributes) {
-      totalEntities = offlineEntitiesEntity.attributes.count ?? 0;
-    }
-    const healthyCount = Math.max(0, totalEntities - offlineCount);
-
-    const offlineDevices = this._parseOfflineEntities(offlineEntitiesEntity);
-    const lowBatteryDevices = this._parseLowBattery(lowBatteryEntity);
-    const hasIssues = offlineDevices.length > 0 || lowBatteryDevices.length > 0;
-
-    const availabilityPct = availabilityEntity
-      ? parseFloat(availabilityEntity.state) || null
-      : null;
-
-    const title =
-      this._config.title || this._formatGroupName(this._config.group);
+    const statusColor = offline > 0 ? "red" : lowBattery > 0 ? "yellow" : "green";
+    const title = this._config.title || this._formatGroupName(this._config.group);
     const compactClass = this._config.compact ? "compact" : "";
 
-    const showDeviceList = hasIssues && (this._expanded || !isAllOk);
+    const statusText = offline > 0
+      ? `${offline} Offline`
+      : lowBattery > 0
+      ? "Degraded"
+      : "All OK";
 
     return html`
       <ha-card class="${compactClass}">
-        <div class="card-header" @click=${this._toggleExpand}>
-          <div class="header-left">
-            <div class="status-indicator ${statusColor}"></div>
-            <span class="group-title">${title}</span>
-          </div>
-          <div class="header-right">
-            ${totalEntities > 0
-              ? `${healthyCount}/${totalEntities} OK`
-              : isAllOk
-              ? "All OK"
-              : "Issues detected"}
-          </div>
-        </div>
-
-        ${hasIssues ? html`<div class="divider"></div>` : nothing}
-
-        <div class="device-list ${showDeviceList ? "expanded" : "collapsed"}">
-          ${offlineDevices.map(
-            (device) => html`
-              <div class="device-item">
-                <div class="device-item-left">
-                  <span class="device-icon">⚠️</span>
-                  <span class="device-name">${device.name}</span>
-                </div>
-                <span class="device-reason">${device.reason}${device.duration ? ` ${device.duration}` : ""}</span>
-              </div>
-            `
-          )}
-          ${lowBatteryDevices.map(
-            (device) => html`
-              <div class="device-item">
-                <div class="device-item-left">
-                  <span class="device-icon">🔋</span>
-                  <span class="device-name">${device.name}</span>
-                </div>
-                <span class="device-reason">${device.reason}</span>
-              </div>
-            `
-          )}
-        </div>
-
-        ${!hasIssues && this._expanded
-          ? html`<div class="no-issues">All entities are healthy.</div>`
-          : nothing}
-
-        ${this._config.show_availability && availabilityPct !== null
-          ? html`
-              <div class="divider"></div>
-              <div class="availability-section">
-                <div class="availability-text">
-                  Availability:
-                  <span class="availability-value"
-                    >${availabilityPct.toFixed(1)}%</span
-                  >
-                  (${this._config.availability_window})
-                </div>
-                ${this._config.show_timeline
-                  ? html`
-                      <div class="timeline-bar">
-                        <div
-                          class="timeline-fill ${this._getAvailabilityColor(
-                            availabilityPct
-                          )}"
-                          style="width: ${Math.min(
-                            100,
-                            Math.max(0, availabilityPct)
-                          )}%"
-                        ></div>
-                      </div>
-                    `
-                  : nothing}
-              </div>
-            `
-          : nothing}
-
-        ${hasIssues
-          ? html`
-              <div class="divider"></div>
-              <div class="actions-section">
-                <button class="suppress-btn" @click=${this._handleSuppress}>
-                  Suppress All
-                </button>
-              </div>
-            `
-          : nothing}
+        ${this._renderHeader(title, statusColor, statusText)}
+        <div class="divider"></div>
+        ${this._renderStats(online, offline, lowBattery, suppressed)}
+        ${suppressed > 0 ? html`<div class="suppressed-banner">${suppressed} entity${suppressed > 1 ? "ies" : ""} suppressed</div>` : nothing}
+        ${this._config.show_availability ? this._renderAvailability(prefix) : nothing}
+        ${this._config.show_entities ? this._renderEntityList(entities, batteryLevels, total) : nothing}
+        ${this._config.show_actions ? this._renderActions(prefix) : nothing}
       </ha-card>
     `;
   }
 
-  _getEntityIds() {
-    const g = this._config.group;
-    const prefix = `entity_availability_${g}`;
-    return {
-      allOk: `binary_sensor.${prefix}_group_health`,
-      anyOffline: `binary_sensor.${prefix}_any_offline`,
-      offlineCount: `sensor.${prefix}_offline_count`,
-      offlineEntities: `sensor.${prefix}_offline_entities`,
-      lowBattery: `sensor.${prefix}_low_battery`,
-      groupSummary: `sensor.${prefix}_group_summary`,
-      availabilityToday: `sensor.${prefix}_availability_today`,
-      availability3d: `sensor.${prefix}_availability_3d`,
-      availability5d: `sensor.${prefix}_availability_5d`,
-      availability7d: `sensor.${prefix}_availability_7d`,
-    };
+  _renderHeader(title, statusColor, statusText) {
+    return html`
+      <div class="card-header">
+        <div class="header-left">
+          <ha-icon
+            class="header-icon"
+            icon="${STATUS_ICONS[statusColor]}"
+            style="color: ${STATUS_COLORS[statusColor]}"
+          ></ha-icon>
+          <span class="group-title">${title}</span>
+        </div>
+        <div class="header-right">${statusText}</div>
+      </div>
+    `;
+  }
+
+  _renderStats(online, offline, lowBattery, suppressed) {
+    return html`
+      <div class="stats-row">
+        <span class="stat-item ${online > 0 ? "online" : "neutral"}">Online: ${online}</span>
+        <span class="stat-item ${offline > 0 ? "offline" : "neutral"}">Offline: ${offline}</span>
+        <span class="stat-item ${lowBattery > 0 ? "battery" : "neutral"}">Low Battery: ${lowBattery}</span>
+      </div>
+    `;
+  }
+
+  _renderAvailability(prefix) {
+    const windows = [];
+    for (const w of AVAILABILITY_WINDOWS) {
+      const entity = this._getEntity(`sensor.${prefix}_availability_${w.key}`);
+      if (entity && entity.state !== "unavailable" && entity.state !== "unknown") {
+        const pct = parseFloat(entity.state) || 0;
+        windows.push({ label: w.label, pct });
+      }
+    }
+
+    if (windows.length === 0) return nothing;
+
+    return html`
+      <div class="divider"></div>
+      <div class="availability-section">
+        ${windows.map(
+          (w) => html`
+            <div class="availability-row">
+              <span class="availability-label">${w.label}</span>
+              <div class="availability-bar">
+                <div
+                  class="availability-fill"
+                  style="width: ${Math.min(100, Math.max(0, w.pct))}%; background-color: ${this._getAvailabilityBarColor(w.pct)}"
+                ></div>
+              </div>
+              <span class="availability-value">${w.pct.toFixed(1)}%</span>
+            </div>
+          `
+        )}
+      </div>
+    `;
+  }
+
+  _renderEntityList(entities, batteryLevels, total) {
+    if (entities.length === 0 && total === 0) return nothing;
+
+    const items = this._buildEntityItems(entities, batteryLevels);
+    const expanded = this._entitiesExpanded;
+    const hasBattery = items.some((i) => i.battery !== null);
+
+    return html`
+      <div class="divider"></div>
+      <div class="entity-section-header" @click=${this._toggleEntities}>
+        <span class="entity-section-title">
+          Entities (${items.length})
+        </span>
+        <ha-icon
+          class="chevron ${expanded ? "expanded" : ""}"
+          icon="mdi:chevron-down"
+        ></ha-icon>
+      </div>
+      <div class="entity-list ${expanded ? "expanded" : "collapsed"}">
+        <div class="entity-legend">
+          <span class="entity-legend-dot"></span>
+          <span class="entity-legend-name">Entity</span>
+          <span class="entity-legend-status">State</span>
+          ${hasBattery ? html`<span class="entity-legend-battery">Bat.</span>` : nothing}
+        </div>
+        ${items.map(
+          (item) => html`
+            <div class="entity-item">
+              <div class="entity-dot ${item.dotColor}"></div>
+              <span class="entity-name">${item.name}</span>
+              <span class="entity-status">${item.status}</span>
+              ${hasBattery
+                ? html`<span class="entity-battery">${item.battery !== null ? `${item.battery}%` : ""}</span>`
+                : nothing}
+            </div>
+          `
+        )}
+      </div>
+    `;
+  }
+
+  _renderActions(prefix) {
+    return html`
+      <div class="divider"></div>
+      <div class="actions-section">
+        <button class="action-btn suppress" @click=${this._handleSuppressAll}>
+          Suppress All
+        </button>
+        <button class="action-btn unsuppress" @click=${this._handleUnsuppressAll}>
+          Unsuppress All
+        </button>
+      </div>
+    `;
+  }
+
+  _buildEntityItems(entities, batteryLevels) {
+    const items = entities.map((entityId) => {
+      const state = this.hass.states[entityId];
+      const friendlyName = state?.attributes?.friendly_name || entityId.split(".").pop();
+      const offlineEntities = this._getOfflineEntityIds();
+      const isOffline = offlineEntities.includes(entityId);
+      const battery = batteryLevels[entityId] ?? null;
+      const batteryThreshold = 20;
+
+      let dotColor = "green";
+      let status = "Online";
+
+      if (isOffline) {
+        dotColor = "red";
+        status = this._computeDuration(entityId) || "Offline";
+      } else if (battery !== null && battery < batteryThreshold) {
+        dotColor = "yellow";
+        status = "Low Battery";
+      }
+
+      return { entityId, name: friendlyName, dotColor, status, battery, isOffline };
+    });
+
+    items.sort((a, b) => {
+      if (a.isOffline && !b.isOffline) return -1;
+      if (!a.isOffline && b.isOffline) return 1;
+      if (a.dotColor === "yellow" && b.dotColor === "green") return -1;
+      if (a.dotColor === "green" && b.dotColor === "yellow") return 1;
+      return a.name.localeCompare(b.name);
+    });
+
+    return items;
+  }
+
+  _getOfflineEntityIds() {
+    const prefix = `entity_availability_${this._config.group}`;
+    const entity = this._getEntity(`sensor.${prefix}_offline_entities`);
+    if (!entity || !entity.attributes) return [];
+    return entity.attributes.entities || [];
   }
 
   _getEntity(entityId) {
-    return this.hass && this.hass.states ? this.hass.states[entityId] : undefined;
+    return this.hass?.states?.[entityId];
   }
 
-  _getAvailabilityEntity(entities) {
-    const window = this._config.availability_window || "7d";
-    if (window === "today") {
-      return this._getEntity(entities.availabilityToday);
-    }
-    if (window === "3d") {
-      return this._getEntity(entities.availability3d);
-    }
-    if (window === "5d") {
-      return this._getEntity(entities.availability5d);
-    }
-    return this._getEntity(entities.availability7d);
-  }
-
-  _parseOfflineEntities(entity) {
-    if (!entity) return [];
-    const stateStr = entity.state;
-    if (
-      !stateStr ||
-      stateStr === "" ||
-      stateStr === "0" ||
-      stateStr === "None" ||
-      stateStr === "unknown" ||
-      stateStr === "unavailable"
-    ) {
-      return [];
-    }
-
-    const names = stateStr
-      .split(",")
-      .map((n) => n.trim())
-      .filter((n) => n !== "" && n !== "None");
-    const entityList =
-      entity.attributes && entity.attributes.entities
-        ? entity.attributes.entities
-        : [];
-
-    return names.map((name, idx) => ({
-      name,
-      reason: "offline",
-      duration: this._computeDuration(entityList[idx]),
-    }));
-  }
-
-  _parseLowBattery(entity) {
-    if (!entity) return [];
-    const stateStr = entity.state;
-    if (!stateStr || stateStr === "" || stateStr === "unknown" || stateStr === "unavailable") {
-      return [];
-    }
-    return stateStr.split(",").map((n) => n.trim()).filter((n) => n !== "").map((name) => ({
-      name,
-      reason: "low battery",
-    }));
+  _getAllEntityIds() {
+    const prefix = `entity_availability_${this._config.group}`;
+    return [
+      `sensor.${prefix}_group_summary`,
+      `sensor.${prefix}_offline_count`,
+      `sensor.${prefix}_offline_entities`,
+      `sensor.${prefix}_low_battery`,
+      `sensor.${prefix}_availability_today`,
+      `sensor.${prefix}_availability_3d`,
+      `sensor.${prefix}_availability_5d`,
+      `sensor.${prefix}_availability_7d`,
+      `binary_sensor.${prefix}_any_offline`,
+    ];
   }
 
   _computeDuration(entityId) {
-    if (!entityId || !this.hass || !this.hass.states[entityId]) return undefined;
-    const lastChanged = this.hass.states[entityId].last_changed;
-    if (!lastChanged) return undefined;
+    const state = this.hass?.states?.[entityId];
+    if (!state?.last_changed) return null;
 
-    const diff = Date.now() - new Date(lastChanged).getTime();
+    const diff = Date.now() - new Date(state.last_changed).getTime();
     const minutes = Math.floor(diff / 60000);
 
     if (minutes < 1) return "just now";
@@ -560,35 +695,48 @@ class EntityAvailabilityCard extends LitElement {
   }
 
   _getAvailabilityColor(pct) {
-    if (pct >= 99) return "green";
-    if (pct >= 95) return "yellow";
+    const t = this._config.availability_thresholds || { green: 99, yellow: 95 };
+    if (pct >= t.green) return "green";
+    if (pct >= t.yellow) return "yellow";
     return "red";
+  }
+
+  _getAvailabilityBarColor(pct) {
+    const t = this._config.availability_thresholds || { green: 99, yellow: 95 };
+    const c = this._config.availability_colors || { green: "#4caf50", yellow: "#ff9800", red: "#f44336" };
+    if (pct >= t.green) return c.green;
+    if (pct >= t.yellow) return c.yellow;
+    return c.red;
   }
 
   _formatGroupName(group) {
     return group.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
   }
 
-  _toggleExpand() {
-    this._expanded = !this._expanded;
+  _toggleEntities() {
+    this._entitiesExpanded = !this._entitiesExpanded;
   }
 
-  async _handleSuppress(e) {
+  async _handleSuppressAll(e) {
     e.stopPropagation();
-    if (!this.hass) return;
+    const offlineIds = this._getOfflineEntityIds();
+    for (const entityId of offlineIds) {
+      await this.hass.callService("entity_availability", "suppress", {
+        entity_id: entityId,
+        duration: 60,
+      });
+    }
+  }
 
-    try {
-      const entities = this._getEntityIds();
-      const offlineState = this.hass.states[entities.offlineEntities];
-      const entityList = offlineState?.attributes?.entities || [];
-      for (const entityId of entityList) {
-        await this.hass.callService("entity_availability", "suppress", {
-          entity_id: entityId,
-          duration: 60,
-        });
-      }
-    } catch (err) {
-      console.error("Failed to call entity_availability.suppress:", err);
+  async _handleUnsuppressAll(e) {
+    e.stopPropagation();
+    const prefix = `entity_availability_${this._config.group}`;
+    const summary = this._getEntity(`sensor.${prefix}_group_summary`);
+    const entities = summary?.attributes?.entities || [];
+    for (const entityId of entities) {
+      await this.hass.callService("entity_availability", "unsuppress", {
+        entity_id: entityId,
+      });
     }
   }
 }
@@ -615,8 +763,7 @@ class EntityAvailabilityCardEditor extends LitElement {
         font-weight: 500;
         margin-bottom: 4px;
       }
-      .editor-row input[type="text"],
-      .editor-row select {
+      .editor-row input[type="text"] {
         width: 100%;
         padding: 8px;
         border: 1px solid var(--divider-color, #ccc);
@@ -630,6 +777,42 @@ class EntityAvailabilityCardEditor extends LitElement {
         align-items: center;
         gap: 8px;
         font-weight: normal;
+      }
+      .color-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 8px;
+      }
+      .color-row label {
+        font-size: 13px;
+        min-width: 80px;
+      }
+      .color-row input[type="color"] {
+        width: 36px;
+        height: 28px;
+        border: 1px solid var(--divider-color, #ccc);
+        border-radius: 4px;
+        cursor: pointer;
+        padding: 2px;
+      }
+      .color-row input[type="number"] {
+        width: 60px;
+        padding: 4px 6px;
+        border: 1px solid var(--divider-color, #ccc);
+        border-radius: 4px;
+        background: var(--card-background-color, #fff);
+        color: var(--primary-text-color, #212121);
+      }
+      .threshold-section {
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid var(--divider-color, #e0e0e0);
+      }
+      .threshold-section > label {
+        display: block;
+        font-weight: 500;
+        margin-bottom: 8px;
       }
     `;
   }
@@ -648,7 +831,7 @@ class EntityAvailabilityCardEditor extends LitElement {
           <input
             type="text"
             .value=${this._config.group || ""}
-            @input=${this._groupChanged}
+            @input=${(e) => this._updateConfig("group", e.target.value)}
             placeholder="e.g. security_devices"
           />
         </div>
@@ -657,40 +840,48 @@ class EntityAvailabilityCardEditor extends LitElement {
           <input
             type="text"
             .value=${this._config.title || ""}
-            @input=${this._titleChanged}
+            @input=${(e) => this._updateConfig("title", e.target.value || undefined)}
             placeholder="Custom card title"
           />
-        </div>
-        <div class="editor-row">
-          <label>Availability Window</label>
-          <select
-            .value=${this._config.availability_window || "7d"}
-            @change=${this._windowChanged}
-          >
-            <option value="today">Today</option>
-            <option value="3d">3 Days</option>
-            <option value="5d">5 Days</option>
-            <option value="7d">7 Days</option>
-          </select>
         </div>
         <div class="editor-row checkbox">
           <label>
             <input
               type="checkbox"
               .checked=${this._config.show_availability !== false}
-              @change=${this._availabilityToggled}
+              @change=${(e) => this._updateConfig("show_availability", e.target.checked)}
             />
-            Show Availability
+            Show Availability Bars
           </label>
         </div>
         <div class="editor-row checkbox">
           <label>
             <input
               type="checkbox"
-              .checked=${this._config.show_timeline !== false}
-              @change=${this._timelineToggled}
+              .checked=${this._config.show_entities !== false}
+              @change=${(e) => this._updateConfig("show_entities", e.target.checked)}
             />
-            Show Timeline Bar
+            Show Entity List
+          </label>
+        </div>
+        <div class="editor-row checkbox">
+          <label>
+            <input
+              type="checkbox"
+              .checked=${this._config.entities_expanded === true}
+              @change=${(e) => this._updateConfig("entities_expanded", e.target.checked)}
+            />
+            Entity List Expanded by Default
+          </label>
+        </div>
+        <div class="editor-row checkbox">
+          <label>
+            <input
+              type="checkbox"
+              .checked=${this._config.show_actions === true}
+              @change=${(e) => this._updateConfig("show_actions", e.target.checked)}
+            />
+            Show Suppress/Unsuppress Buttons
           </label>
         </div>
         <div class="editor-row checkbox">
@@ -698,37 +889,66 @@ class EntityAvailabilityCardEditor extends LitElement {
             <input
               type="checkbox"
               .checked=${this._config.compact === true}
-              @change=${this._compactToggled}
+              @change=${(e) => this._updateConfig("compact", e.target.checked)}
             />
             Compact Mode
           </label>
+        </div>
+        <div class="threshold-section">
+          <label>Availability Bar Colors & Thresholds</label>
+          <div class="color-row">
+            <label>High ≥</label>
+            <input
+              type="number"
+              min="0" max="100"
+              .value=${(this._config.availability_thresholds?.green ?? 99).toString()}
+              @input=${(e) => this._updateThreshold("green", e.target.value)}
+            />
+            <span>%</span>
+            <input
+              type="color"
+              .value=${this._config.availability_colors?.green || "#4caf50"}
+              @input=${(e) => this._updateColor("green", e.target.value)}
+            />
+          </div>
+          <div class="color-row">
+            <label>Mid ≥</label>
+            <input
+              type="number"
+              min="0" max="100"
+              .value=${(this._config.availability_thresholds?.yellow ?? 95).toString()}
+              @input=${(e) => this._updateThreshold("yellow", e.target.value)}
+            />
+            <span>%</span>
+            <input
+              type="color"
+              .value=${this._config.availability_colors?.yellow || "#ff9800"}
+              @input=${(e) => this._updateColor("yellow", e.target.value)}
+            />
+          </div>
+          <div class="color-row">
+            <label>Low below</label>
+            <input
+              type="color"
+              .value=${this._config.availability_colors?.red || "#f44336"}
+              @input=${(e) => this._updateColor("red", e.target.value)}
+            />
+          </div>
         </div>
       </div>
     `;
   }
 
-  _groupChanged(ev) {
-    this._updateConfig("group", ev.target.value);
+  _updateThreshold(level, value) {
+    const thresholds = { ...(this._config.availability_thresholds || { green: 99, yellow: 95 }) };
+    thresholds[level] = parseInt(value, 10) || 0;
+    this._updateConfig("availability_thresholds", thresholds);
   }
 
-  _titleChanged(ev) {
-    this._updateConfig("title", ev.target.value || undefined);
-  }
-
-  _windowChanged(ev) {
-    this._updateConfig("availability_window", ev.target.value);
-  }
-
-  _availabilityToggled(ev) {
-    this._updateConfig("show_availability", ev.target.checked);
-  }
-
-  _timelineToggled(ev) {
-    this._updateConfig("show_timeline", ev.target.checked);
-  }
-
-  _compactToggled(ev) {
-    this._updateConfig("compact", ev.target.checked);
+  _updateColor(level, value) {
+    const colors = { ...(this._config.availability_colors || { green: "#4caf50", yellow: "#ff9800", red: "#f44336" }) };
+    colors[level] = value;
+    this._updateConfig("availability_colors", colors);
   }
 
   _updateConfig(key, value) {
@@ -748,18 +968,13 @@ class EntityAvailabilityCardEditor extends LitElement {
   }
 }
 
-customElements.define(
-  "entity-availability-card-editor",
-  EntityAvailabilityCardEditor
-);
+customElements.define("entity-availability-card-editor", EntityAvailabilityCardEditor);
 
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: "entity-availability-card",
   name: "Entity Availability Card",
-  description:
-    "Shows entity health status with traffic-light indicators for a monitored group.",
+  description: "Dashboard-style entity health monitoring with availability bars and entity list.",
   preview: true,
-  documentationURL:
-    "https://github.com/italo-lombardi/Home-Assistant-EntityAvailability",
+  documentationURL: "https://github.com/italo-lombardi/Home-Assistant-EntityAvailability",
 });
