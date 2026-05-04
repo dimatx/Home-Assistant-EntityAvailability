@@ -695,18 +695,18 @@ class EntityAvailabilityCard extends LitElement {
   }
 
   _getAvailabilityColor(pct) {
-    const t = this._config.availability_thresholds || { green: 99, yellow: 95 };
-    if (pct >= t.green) return "green";
-    if (pct >= t.yellow) return "yellow";
+    const t = this._config.availability_thresholds || { high: 99, mid: 95 };
+    if (pct >= t.high) return "green";
+    if (pct >= t.mid) return "yellow";
     return "red";
   }
 
   _getAvailabilityBarColor(pct) {
-    const t = this._config.availability_thresholds || { green: 99, yellow: 95 };
-    const c = this._config.availability_colors || { green: "#4caf50", yellow: "#ff9800", red: "#f44336" };
-    if (pct >= t.green) return c.green;
-    if (pct >= t.yellow) return c.yellow;
-    return c.red;
+    const t = this._config.availability_thresholds || { high: 99, mid: 95 };
+    const c = this._config.availability_colors || { high: "#4caf50", mid: "#ff9800", low: "#f44336" };
+    if (pct >= t.high) return c.high;
+    if (pct >= t.mid) return c.mid;
+    return c.low;
   }
 
   _formatGroupName(group) {
@@ -901,14 +901,14 @@ class EntityAvailabilityCardEditor extends LitElement {
             <input
               type="number"
               min="0" max="100"
-              .value=${(this._config.availability_thresholds?.green ?? 99).toString()}
-              @input=${(e) => this._updateThreshold("green", e.target.value)}
+              .value=${(this._config.availability_thresholds?.high ?? 99).toString()}
+              @input=${(e) => this._updateThreshold("high", e.target.value)}
             />
             <span>%</span>
             <input
               type="color"
-              .value=${this._config.availability_colors?.green || "#4caf50"}
-              @input=${(e) => this._updateColor("green", e.target.value)}
+              .value=${this._config.availability_colors?.high || "#4caf50"}
+              @input=${(e) => this._updateColor("high", e.target.value)}
             />
           </div>
           <div class="color-row">
@@ -916,22 +916,22 @@ class EntityAvailabilityCardEditor extends LitElement {
             <input
               type="number"
               min="0" max="100"
-              .value=${(this._config.availability_thresholds?.yellow ?? 95).toString()}
-              @input=${(e) => this._updateThreshold("yellow", e.target.value)}
+              .value=${(this._config.availability_thresholds?.mid ?? 95).toString()}
+              @input=${(e) => this._updateThreshold("mid", e.target.value)}
             />
             <span>%</span>
             <input
               type="color"
-              .value=${this._config.availability_colors?.yellow || "#ff9800"}
-              @input=${(e) => this._updateColor("yellow", e.target.value)}
+              .value=${this._config.availability_colors?.mid || "#ff9800"}
+              @input=${(e) => this._updateColor("mid", e.target.value)}
             />
           </div>
           <div class="color-row">
             <label>Low below</label>
             <input
               type="color"
-              .value=${this._config.availability_colors?.red || "#f44336"}
-              @input=${(e) => this._updateColor("red", e.target.value)}
+              .value=${this._config.availability_colors?.low || "#f44336"}
+              @input=${(e) => this._updateColor("low", e.target.value)}
             />
           </div>
         </div>
@@ -940,13 +940,13 @@ class EntityAvailabilityCardEditor extends LitElement {
   }
 
   _updateThreshold(level, value) {
-    const thresholds = { ...(this._config.availability_thresholds || { green: 99, yellow: 95 }) };
+    const thresholds = { ...(this._config.availability_thresholds || { high: 99, mid: 95 }) };
     thresholds[level] = parseInt(value, 10) || 0;
     this._updateConfig("availability_thresholds", thresholds);
   }
 
   _updateColor(level, value) {
-    const colors = { ...(this._config.availability_colors || { green: "#4caf50", yellow: "#ff9800", red: "#f44336" }) };
+    const colors = { ...(this._config.availability_colors || { high: "#4caf50", mid: "#ff9800", low: "#f44336" }) };
     colors[level] = value;
     this._updateConfig("availability_colors", colors);
   }

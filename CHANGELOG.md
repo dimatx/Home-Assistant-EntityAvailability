@@ -28,7 +28,7 @@ All notable changes to this project will be documented in this file.
 - Card: status icon (mdi:check-circle / alert-circle / close-circle) colored by group health
 - Card: stats row with Online / Offline / Low Battery counts
 - Card: all configured availability windows shown with colored progress bars
-- Card: customizable bar colors and thresholds via visual editor
+- Card: customizable bar colors and thresholds via visual editor (keys: `high`, `mid`, `low`)
 - Card: expandable entity list with legend header, battery %, sorted by severity
 - Card: optional suppress/unsuppress action buttons
 - Card: suppressed entities banner

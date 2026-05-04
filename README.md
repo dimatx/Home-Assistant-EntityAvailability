@@ -348,12 +348,12 @@ entities_expanded: false
 show_actions: false
 compact: false
 availability_thresholds:
-  green: 99
-  yellow: 95
+  high: 99
+  mid: 95
 availability_colors:
-  green: "#4caf50"
-  yellow: "#ff9800"
-  red: "#f44336"
+  high: "#4caf50"
+  mid: "#ff9800"
+  low: "#f44336"
 ```
 
 | Option | Default | Description |
@@ -365,8 +365,8 @@ availability_colors:
 | `entities_expanded` | `false` | Start entity list expanded |
 | `show_actions` | `false` | Show Suppress/Unsuppress buttons |
 | `compact` | `false` | Reduced padding mode |
-| `availability_thresholds` | `{green: 99, yellow: 95}` | % thresholds for bar colors |
-| `availability_colors` | `{green, yellow, red}` | Custom hex colors for bars |
+| `availability_thresholds` | `{high: 99, mid: 95}` | % thresholds for bar colors |
+| `availability_colors` | `{high, mid, low}` | Custom hex colors for bars |
 
 The `group` field should be the group slug (e.g., `security_devices`). The card uses the prefix `entity_availability_` + group slug to locate all related entities automatically.
 
