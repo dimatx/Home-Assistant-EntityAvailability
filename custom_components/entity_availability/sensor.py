@@ -53,6 +53,9 @@ async def async_setup_entry(
         entities.append(
             DegradedDevicesSensor(coordinator, group_name, group_slug, entry.entry_id)
         )
+        entities.append(
+            LowBatteryCountSensor(coordinator, group_name, group_slug, entry.entry_id)
+        )
 
     for window in windows:
         entities.append(
@@ -198,7 +201,7 @@ class DegradedDevicesSensor(
         self._attr_device_info = _device_info(entry_id, group_slug, group_name)
 
     @property
-    def native_value(self) -> str:
+    def native_value(self) -> str | None:
         """Return comma-separated list of low battery device names."""
         low_bat = [
             self._format_device(d)
@@ -206,7 +209,7 @@ class DegradedDevicesSensor(
             if d.is_degraded and not d.is_suppressed and d.battery_level is not None
         ]
         if not low_bat:
-            return ""
+            return None
         result = ", ".join(low_bat)
         if len(result) > MAX_STATE_LENGTH - 3:
             result = result[: MAX_STATE_LENGTH - 3] + "..."
@@ -229,6 +232,38 @@ class DegradedDevicesSensor(
         else:
             name = device.entity_id.split(".")[-1].replace("_", " ").title()
         return f"{name} ({device.battery_level}%)"
+
+
+class LowBatteryCountSensor(
+    CoordinatorEntity[EntityAvailabilityCoordinator], SensorEntity
+):
+    """Sensor showing count of devices with low battery."""
+
+    _attr_icon = "mdi:battery-alert-variant-outline"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        coordinator: EntityAvailabilityCoordinator,
+        group_name: str,
+        group_slug: str,
+        entry_id: str,
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{entry_id}_low_battery_count"
+        self._attr_name = "Low Battery Count"
+        self._attr_device_info = _device_info(entry_id, group_slug, group_name)
+
+    @property
+    def native_value(self) -> int:
+        """Return count of devices with low battery."""
+        return sum(
+            1
+            for d in self.coordinator.device_states.values()
+            if d.is_degraded and not d.is_suppressed and d.battery_level is not None
+        )
 
 
 class AvailabilitySensor(
