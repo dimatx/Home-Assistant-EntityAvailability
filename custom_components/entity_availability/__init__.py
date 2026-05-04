@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import shutil
 from pathlib import Path
 
 from homeassistant.config_entries import ConfigEntry
@@ -17,7 +18,14 @@ _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BINARY_SENSOR]
 
-LOVELACE_CARD_URL = f"/{DOMAIN}/entity-availability-card.js"
+CARD_FILENAME = "entity-availability-card.js"
+CARD_URL = f"/local/community/{DOMAIN}/{CARD_FILENAME}"
+
+
+async def async_setup(hass: HomeAssistant, config: dict) -> bool:
+    """Set up the Entity Availability integration (once, before entries)."""
+    await _async_install_card(hass)
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -31,16 +39,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    # Register cleanup on unload
     entry.async_on_unload(coordinator.async_shutdown)
-
-    # Listen for options updates
     entry.async_on_unload(entry.add_update_listener(_async_update_options))
 
     await async_setup_services(hass)
-
-    # Register the frontend card resource
-    await _async_register_card(hass)
 
     return True
 
@@ -50,88 +52,63 @@ async def _async_update_options(hass: HomeAssistant, entry: ConfigEntry) -> None
     await hass.config_entries.async_reload(entry.entry_id)
 
 
-async def _async_register_card(hass: HomeAssistant) -> None:
-    """Register the custom Lovelace card as a static resource."""
-    if f"{DOMAIN}_card_registered" in hass.data:
+async def _async_install_card(hass: HomeAssistant) -> None:
+    """Copy card JS to www/community folder so it's served via /local/."""
+    source = Path(__file__).parent / "frontend" / CARD_FILENAME
+    if not source.exists():
+        _LOGGER.warning("Card JS not found at %s", source)
         return
 
-    card_path = Path(__file__).parent / "frontend" / "entity-availability-card.js"
-
-    if not card_path.exists():
-        _LOGGER.warning(
-            "Could not find entity-availability-card.js at %s. "
-            "Card will not be available in the dashboard.",
-            card_path,
-        )
-        return
+    www_dir = Path(hass.config.path("www")) / "community" / DOMAIN
+    dest = www_dir / CARD_FILENAME
 
     try:
-        hass.http.register_static_path(
-            LOVELACE_CARD_URL,
-            str(card_path.resolve()),
-            cache_headers=False,
-        )
-        _LOGGER.debug("Registered entity-availability-card.js at %s", LOVELACE_CARD_URL)
-    except Exception:  # noqa: BLE001
-        _LOGGER.warning(
-            "Could not register static path for entity-availability-card.js"
-        )
+        www_dir.mkdir(parents=True, exist_ok=True)
+        if not dest.exists() or source.stat().st_mtime > dest.stat().st_mtime:
+            await hass.async_add_executor_job(shutil.copy2, source, dest)
+            _LOGGER.info("Installed %s to %s", CARD_FILENAME, dest)
+    except OSError:
+        _LOGGER.warning("Could not copy card JS to %s", dest)
         return
 
-    # Add the resource to Lovelace
-    # Try the lovelace integration's resource collection
+    # Register as Lovelace resource
     try:
         from homeassistant.components.lovelace import (  # noqa: PLC0415
             DOMAIN as LOVELACE_DOMAIN,
         )
 
         lovelace_info = hass.data.get(LOVELACE_DOMAIN)
+        resources = None
         if lovelace_info:
-            resources = None
-            # Storage mode: lovelace_info has a resources attribute
             if hasattr(lovelace_info, "resources"):
                 resources = lovelace_info.resources
-            # Alternative: dict-based storage
             elif isinstance(lovelace_info, dict):
                 for dashboard in lovelace_info.values():
                     if hasattr(dashboard, "resources"):
                         resources = dashboard.resources
                         break
+        if resources is None:
+            resources = hass.data.get("lovelace_resources")
 
-            if resources is None:
-                resources = hass.data.get("lovelace_resources")
-
-            if resources is not None:
-                existing = [
-                    r
-                    for r in resources.async_items()
-                    if LOVELACE_CARD_URL in r.get("url", "")
-                ]
-                if not existing:
-                    await resources.async_create_item(
-                        {"res_type": "module", "url": LOVELACE_CARD_URL}
-                    )
-                    _LOGGER.info("Added entity-availability-card as Lovelace resource")
-            else:
-                _LOGGER.info(
-                    "Lovelace resources not available. "
-                    "Add manually: url: %s, type: module",
-                    LOVELACE_CARD_URL,
+        if resources is not None:
+            existing = [
+                r for r in resources.async_items() if CARD_FILENAME in r.get("url", "")
+            ]
+            if not existing:
+                await resources.async_create_item(
+                    {"res_type": "module", "url": CARD_URL}
                 )
+                _LOGGER.info("Registered %s as Lovelace resource", CARD_URL)
         else:
             _LOGGER.info(
-                "Lovelace not initialized. "
-                "Add resource manually: url: %s, type: module",
-                LOVELACE_CARD_URL,
+                "Add Lovelace resource manually: url: %s, type: module", CARD_URL
             )
     except Exception:  # noqa: BLE001
         _LOGGER.info(
             "Could not auto-register Lovelace resource. "
             "Add manually: url: %s, type: module",
-            LOVELACE_CARD_URL,
+            CARD_URL,
         )
-
-    hass.data[f"{DOMAIN}_card_registered"] = True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -139,7 +116,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         hass.data[DOMAIN].pop(entry.entry_id)
 
-    # Remove services if this was the last entry
     if not hass.data.get(DOMAIN):
         async_unload_services(hass)
 
