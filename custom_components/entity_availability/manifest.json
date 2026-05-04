@@ -1,7 +1,7 @@
 {
   "domain": "entity_availability",
   "name": "Entity Availability",
-  "after_dependencies": ["lovelace"],
+  "after_dependencies": ["http", "lovelace"],
   "codeowners": ["@italo-lombardi"],
   "config_flow": true,
   "dependencies": [],
