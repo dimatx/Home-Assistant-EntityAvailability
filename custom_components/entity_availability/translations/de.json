@@ -1,0 +1,82 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Entitätsgruppe erstellen",
+        "description": "Erstellen Sie eine Gruppe von Entitäten zur Verfügbarkeitsüberwachung.",
+        "data": {
+          "group_name": "Gruppenname",
+          "entities": "Zu überwachende Entitäten"
+        }
+      },
+      "monitoring": {
+        "title": "Überwachungseinstellungen",
+        "description": "Konfigurieren Sie, wie Entitäten überwacht werden.",
+        "data": {
+          "bad_states": "Zustände, die als offline gelten",
+          "cooldown": "Abklingzeit vor Offline-Markierung",
+          "staleness_threshold": "Veralterungsschwelle"
+        },
+        "data_description": {
+          "bad_states": "Entitätszustände, die darauf hinweisen, dass eine Entität offline ist (z. B. nicht verfügbar, unbekannt).",
+          "cooldown": "Wie lange (in Sekunden) eine Entität in einem schlechten Zustand bleiben muss, bevor sie als offline markiert wird. Verhindert Fehlalarme durch kurze Verbindungsunterbrechungen.",
+          "staleness_threshold": "Wenn eine Entität ihren Zustand seit dieser Anzahl von Minuten nicht geändert hat, wird sie als beeinträchtigt markiert. Dies erkennt Entitäten, die 'verfügbar' melden, aber tatsächlich keine Daten mehr senden. Auf 0 setzen zum Deaktivieren."
+        }
+      },
+      "advanced": {
+        "title": "Erweiterte Einstellungen",
+        "description": "Optionale erweiterte Überwachungsfunktionen.",
+        "data": {
+          "battery_threshold": "Niedriger Batterieschwellenwert (%, 0 = deaktiviert)",
+          "availability_windows": "Verfügbarkeits-Tracking-Zeiträume"
+        }
+      },
+      "battery_mapping": {
+        "title": "Batterie-Entitätszuordnung",
+        "description": "Bestätigen oder ändern Sie den Batteriesensor für jede überwachte Entität. Leer lassen für Entitäten ohne Batterien. Unterstützt numerische (%) und Textzustände ('niedrig')."
+      }
+    },
+    "error": {
+      "empty_group_name": "Der Gruppenname darf nicht leer sein.",
+      "no_entities": "Sie müssen mindestens eine Entität auswählen."
+    },
+    "abort": {
+      "already_configured": "Eine Gruppe mit diesem Namen existiert bereits."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Entitätsgruppe bearbeiten",
+        "description": "Überwachungseinstellungen für diese Gruppe ändern.",
+        "data": {
+          "entities": "Zu überwachende Entitäten",
+          "bad_states": "Zustände, die als offline gelten",
+          "cooldown": "Abklingzeit (Sekunden)",
+          "staleness_threshold": "Veralterungsschwelle (Minuten, 0 = deaktiviert)",
+          "battery_threshold": "Niedriger Batterieschwellenwert (%, 0 = deaktiviert)",
+          "availability_windows": "Verfügbarkeits-Tracking-Zeiträume"
+        }
+      },
+      "battery_mapping": {
+        "title": "Batterie-Entitätszuordnung",
+        "description": "Bestätigen oder ändern Sie den Batteriesensor für jede überwachte Entität. Leer lassen für Entitäten ohne Batterien. Unterstützt numerische (%) und Textzustände ('niedrig')."
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "offline_count": { "name": "Offline-Anzahl" },
+      "offline_entities": { "name": "Offline-Entitäten" },
+      "low_battery": { "name": "Niedriger Batteriestand" },
+      "group_summary": { "name": "Gruppenzusammenfassung" },
+      "availability_today": { "name": "Verfügbarkeit (Heute)" },
+      "availability_3d": { "name": "Verfügbarkeit (3 Tage)" },
+      "availability_5d": { "name": "Verfügbarkeit (5 Tage)" },
+      "availability_7d": { "name": "Verfügbarkeit (7 Tage)" }
+    },
+    "binary_sensor": {
+      "any_offline": { "name": "Beliebige offline" }
+    }
+  }
+}

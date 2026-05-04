@@ -1,0 +1,100 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Create Entity Group",
+        "description": "Create a group of entities to monitor for availability.",
+        "data": {
+          "group_name": "Group Name",
+          "entities": "Entities to Monitor"
+        }
+      },
+      "monitoring": {
+        "title": "Monitoring Settings",
+        "description": "Configure how entities are monitored.",
+        "data": {
+          "bad_states": "States considered offline",
+          "cooldown": "Cooldown before marking offline",
+          "staleness_threshold": "Staleness threshold"
+        },
+        "data_description": {
+          "bad_states": "Entity states that indicate an entity is offline (e.g., unavailable, unknown).",
+          "cooldown": "How long (in seconds) an entity must stay in a bad state before it is marked offline. Prevents false alarms from brief disconnections.",
+          "staleness_threshold": "If an entity hasn't changed state for this many minutes, mark it as degraded. This catches entities that report 'available' but have actually stopped sending data. Set to 0 to disable."
+        }
+      },
+      "advanced": {
+        "title": "Advanced Settings",
+        "description": "Optional advanced monitoring features.",
+        "data": {
+          "battery_threshold": "Low battery threshold (%, 0 = disabled)",
+          "availability_windows": "Availability tracking windows"
+        }
+      },
+      "battery_mapping": {
+        "title": "Battery Entity Mapping",
+        "description": "Confirm or change the battery sensor for each monitored entity. Leave empty for entities without batteries."
+      }
+    },
+    "error": {
+      "empty_group_name": "Group name cannot be empty.",
+      "no_entities": "You must select at least one entity."
+    },
+    "abort": {
+      "already_configured": "A group with this name already exists."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Edit Entity Group",
+        "description": "Modify monitoring settings for this group.",
+        "data": {
+          "entities": "Entities to Monitor",
+          "bad_states": "States considered offline",
+          "cooldown": "Cooldown (seconds)",
+          "staleness_threshold": "Staleness threshold (minutes, 0 = disabled)",
+          "battery_threshold": "Low battery threshold (%, 0 = disabled)",
+          "availability_windows": "Availability tracking windows"
+        }
+      },
+      "battery_mapping": {
+        "title": "Battery Entity Mapping",
+        "description": "Confirm or change the battery sensor for each monitored entity. Leave empty for entities without batteries. Supports numeric (%) and text states ('low')."
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "offline_count": {
+        "name": "Offline Count"
+      },
+      "offline_entities": {
+        "name": "Offline Entities"
+      },
+      "low_battery": {
+        "name": "Low Battery"
+      },
+      "group_summary": {
+        "name": "Group Summary"
+      },
+      "availability_today": {
+        "name": "Availability (Today)"
+      },
+      "availability_3d": {
+        "name": "Availability (3 Days)"
+      },
+      "availability_5d": {
+        "name": "Availability (5 Days)"
+      },
+      "availability_7d": {
+        "name": "Availability (7 Days)"
+      }
+    },
+    "binary_sensor": {
+      "any_offline": {
+        "name": "Any Offline"
+      }
+    }
+  }
+}

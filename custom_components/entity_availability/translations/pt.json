@@ -1,0 +1,82 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Criar Grupo de Entidades",
+        "description": "Crie um grupo de entidades para monitorizar a disponibilidade.",
+        "data": {
+          "group_name": "Nome do Grupo",
+          "entities": "Entidades a Monitorizar"
+        }
+      },
+      "monitoring": {
+        "title": "Definições de Monitorização",
+        "description": "Configure como as entidades são monitorizadas.",
+        "data": {
+          "bad_states": "Estados considerados offline",
+          "cooldown": "Tempo de espera antes de marcar como offline",
+          "staleness_threshold": "Limiar de inatividade"
+        },
+        "data_description": {
+          "bad_states": "Estados da entidade que indicam que está offline (ex.: indisponível, desconhecido).",
+          "cooldown": "Quanto tempo (em segundos) uma entidade deve permanecer num estado negativo antes de ser marcada como offline. Evita falsos alarmes de desconexões breves.",
+          "staleness_threshold": "Se uma entidade não mudou de estado durante este número de minutos, marcá-la como degradada. Isto deteta entidades que reportam 'disponível' mas que na verdade pararam de enviar dados. Defina como 0 para desativar."
+        }
+      },
+      "advanced": {
+        "title": "Definições Avançadas",
+        "description": "Funcionalidades avançadas de monitorização opcionais.",
+        "data": {
+          "battery_threshold": "Limiar de bateria fraca (%, 0 = desativado)",
+          "availability_windows": "Janelas de rastreio de disponibilidade"
+        }
+      },
+      "battery_mapping": {
+        "title": "Mapeamento de Entidades de Bateria",
+        "description": "Confirme ou altere o sensor de bateria para cada entidade monitorizada. Deixe vazio para entidades sem bateria. Suporta estados numéricos (%) e de texto ('low')."
+      }
+    },
+    "error": {
+      "empty_group_name": "O nome do grupo não pode estar vazio.",
+      "no_entities": "Deve selecionar pelo menos uma entidade."
+    },
+    "abort": {
+      "already_configured": "Já existe um grupo com este nome."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Editar Grupo de Entidades",
+        "description": "Modificar definições de monitorização para este grupo.",
+        "data": {
+          "entities": "Entidades a Monitorizar",
+          "bad_states": "Estados considerados offline",
+          "cooldown": "Tempo de espera (segundos)",
+          "staleness_threshold": "Limiar de inatividade (minutos, 0 = desativado)",
+          "battery_threshold": "Limiar de bateria fraca (%, 0 = desativado)",
+          "availability_windows": "Janelas de rastreio de disponibilidade"
+        }
+      },
+      "battery_mapping": {
+        "title": "Mapeamento de Entidades de Bateria",
+        "description": "Confirme ou altere o sensor de bateria para cada entidade monitorizada. Deixe vazio para entidades sem bateria. Suporta estados numéricos (%) e de texto ('low')."
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "offline_count": { "name": "Contagem Offline" },
+      "offline_entities": { "name": "Entidades Offline" },
+      "low_battery": { "name": "Bateria Fraca" },
+      "group_summary": { "name": "Resumo do Grupo" },
+      "availability_today": { "name": "Disponibilidade (Hoje)" },
+      "availability_3d": { "name": "Disponibilidade (3 Dias)" },
+      "availability_5d": { "name": "Disponibilidade (5 Dias)" },
+      "availability_7d": { "name": "Disponibilidade (7 Dias)" }
+    },
+    "binary_sensor": {
+      "any_offline": { "name": "Alguma Offline" }
+    }
+  }
+}

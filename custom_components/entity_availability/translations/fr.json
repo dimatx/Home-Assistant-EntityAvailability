@@ -1,0 +1,82 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Créer un groupe d'entités",
+        "description": "Créez un groupe d'entités à surveiller pour la disponibilité.",
+        "data": {
+          "group_name": "Nom du groupe",
+          "entities": "Entités à surveiller"
+        }
+      },
+      "monitoring": {
+        "title": "Paramètres de surveillance",
+        "description": "Configurez la façon dont les entités sont surveillées.",
+        "data": {
+          "bad_states": "États considérés comme hors ligne",
+          "cooldown": "Délai avant marquage hors ligne",
+          "staleness_threshold": "Seuil d'obsolescence"
+        },
+        "data_description": {
+          "bad_states": "États d'entité indiquant qu'une entité est hors ligne (par ex., indisponible, inconnu).",
+          "cooldown": "Durée (en secondes) pendant laquelle une entité doit rester dans un mauvais état avant d'être marquée hors ligne. Empêche les fausses alertes dues à de brèves déconnexions.",
+          "staleness_threshold": "Si une entité n'a pas changé d'état depuis ce nombre de minutes, la marquer comme dégradée. Cela détecte les entités qui signalent 'disponible' mais ont en réalité cessé d'envoyer des données. Mettre à 0 pour désactiver."
+        }
+      },
+      "advanced": {
+        "title": "Paramètres avancés",
+        "description": "Fonctions de surveillance avancées optionnelles.",
+        "data": {
+          "battery_threshold": "Seuil de batterie faible (%, 0 = désactivé)",
+          "availability_windows": "Fenêtres de suivi de disponibilité"
+        }
+      },
+      "battery_mapping": {
+        "title": "Association des entités de batterie",
+        "description": "Confirmez ou modifiez le capteur de batterie pour chaque entité surveillée. Laissez vide pour les entités sans batterie. Prend en charge les états numériques (%) et textuels ('faible')."
+      }
+    },
+    "error": {
+      "empty_group_name": "Le nom du groupe ne peut pas être vide.",
+      "no_entities": "Vous devez sélectionner au moins une entité."
+    },
+    "abort": {
+      "already_configured": "Un groupe avec ce nom existe déjà."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Modifier le groupe d'entités",
+        "description": "Modifier les paramètres de surveillance pour ce groupe.",
+        "data": {
+          "entities": "Entités à surveiller",
+          "bad_states": "États considérés comme hors ligne",
+          "cooldown": "Délai (secondes)",
+          "staleness_threshold": "Seuil d'obsolescence (minutes, 0 = désactivé)",
+          "battery_threshold": "Seuil de batterie faible (%, 0 = désactivé)",
+          "availability_windows": "Fenêtres de suivi de disponibilité"
+        }
+      },
+      "battery_mapping": {
+        "title": "Association des entités de batterie",
+        "description": "Confirmez ou modifiez le capteur de batterie pour chaque entité surveillée. Laissez vide pour les entités sans batterie. Prend en charge les états numériques (%) et textuels ('faible')."
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "offline_count": { "name": "Nombre hors ligne" },
+      "offline_entities": { "name": "Entités hors ligne" },
+      "low_battery": { "name": "Batterie faible" },
+      "group_summary": { "name": "Résumé du groupe" },
+      "availability_today": { "name": "Disponibilité (Aujourd'hui)" },
+      "availability_3d": { "name": "Disponibilité (3 jours)" },
+      "availability_5d": { "name": "Disponibilité (5 jours)" },
+      "availability_7d": { "name": "Disponibilité (7 jours)" }
+    },
+    "binary_sensor": {
+      "any_offline": { "name": "Au moins un hors ligne" }
+    }
+  }
+}

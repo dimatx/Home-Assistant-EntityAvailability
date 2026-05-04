@@ -1,0 +1,82 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Utwórz grupę encji",
+        "description": "Utwórz grupę encji do monitorowania dostępności.",
+        "data": {
+          "group_name": "Nazwa grupy",
+          "entities": "Encje do monitorowania"
+        }
+      },
+      "monitoring": {
+        "title": "Ustawienia monitorowania",
+        "description": "Skonfiguruj sposób monitorowania encji.",
+        "data": {
+          "bad_states": "Stany uznawane za offline",
+          "cooldown": "Czas oczekiwania przed oznaczeniem jako offline",
+          "staleness_threshold": "Próg nieaktywności"
+        },
+        "data_description": {
+          "bad_states": "Stany encji wskazujące, że jest offline (np. niedostępny, nieznany).",
+          "cooldown": "Jak długo (w sekundach) encja musi pozostawać w złym stanie, zanim zostanie oznaczona jako offline. Zapobiega fałszywym alarmom wywołanym krótkimi rozłączeniami.",
+          "staleness_threshold": "Jeśli encja nie zmieniła stanu przez tę liczbę minut, oznacz ją jako zdegradowaną. Wykrywa encje, które zgłaszają 'dostępność', ale przestały wysyłać dane. Ustaw na 0, aby wyłączyć."
+        }
+      },
+      "advanced": {
+        "title": "Ustawienia zaawansowane",
+        "description": "Opcjonalne zaawansowane funkcje monitorowania.",
+        "data": {
+          "battery_threshold": "Próg niskiego poziomu baterii (%, 0 = wyłączony)",
+          "availability_windows": "Okna śledzenia dostępności"
+        }
+      },
+      "battery_mapping": {
+        "title": "Mapowanie czujnika baterii",
+        "description": "Potwierdź lub zmień czujnik baterii dla każdej monitorowanej encji. Pozostaw puste dla encji bez baterii. Obsługuje stany numeryczne (%) i tekstowe ('low')."
+      }
+    },
+    "error": {
+      "empty_group_name": "Nazwa grupy nie może być pusta.",
+      "no_entities": "Musisz wybrać co najmniej jedną encję."
+    },
+    "abort": {
+      "already_configured": "Grupa o tej nazwie już istnieje."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Edytuj grupę encji",
+        "description": "Zmień ustawienia monitorowania dla tej grupy.",
+        "data": {
+          "entities": "Encje do monitorowania",
+          "bad_states": "Stany uznawane za offline",
+          "cooldown": "Czas oczekiwania (sekundy)",
+          "staleness_threshold": "Próg nieaktywności (minuty, 0 = wyłączony)",
+          "battery_threshold": "Próg niskiego poziomu baterii (%, 0 = wyłączony)",
+          "availability_windows": "Okna śledzenia dostępności"
+        }
+      },
+      "battery_mapping": {
+        "title": "Mapowanie czujnika baterii",
+        "description": "Potwierdź lub zmień czujnik baterii dla każdej monitorowanej encji. Pozostaw puste dla encji bez baterii. Obsługuje stany numeryczne (%) i tekstowe ('low')."
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "offline_count": { "name": "Liczba offline" },
+      "offline_entities": { "name": "Encje offline" },
+      "low_battery": { "name": "Niski poziom baterii" },
+      "group_summary": { "name": "Podsumowanie grupy" },
+      "availability_today": { "name": "Dostępność (dzisiaj)" },
+      "availability_3d": { "name": "Dostępność (3 dni)" },
+      "availability_5d": { "name": "Dostępność (5 dni)" },
+      "availability_7d": { "name": "Dostępność (7 dni)" }
+    },
+    "binary_sensor": {
+      "any_offline": { "name": "Którakolwiek offline" }
+    }
+  }
+}

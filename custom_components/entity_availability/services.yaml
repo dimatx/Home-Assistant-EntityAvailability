@@ -1,0 +1,43 @@
+suppress:
+  name: Suppress entity
+  description: Temporarily exclude an entity or entire group from availability monitoring and offline alerts.
+  fields:
+    entity_id:
+      name: Entity
+      description: The entity ID to suppress. Optional if group is provided.
+      required: false
+      selector:
+        entity:
+    group:
+      name: Group
+      description: The group name to suppress. When provided without entity_id, all entities in the group are suppressed.
+      required: false
+      selector:
+        text:
+    duration:
+      name: Duration (minutes)
+      description: How long to suppress monitoring (1-10080 minutes). Default 60.
+      required: false
+      default: 60
+      selector:
+        number:
+          min: 1
+          max: 10080
+          unit_of_measurement: minutes
+
+unsuppress:
+  name: Unsuppress entity
+  description: Resume monitoring for a previously suppressed entity or entire group.
+  fields:
+    entity_id:
+      name: Entity
+      description: The entity ID to unsuppress. Optional if group is provided.
+      required: false
+      selector:
+        entity:
+    group:
+      name: Group
+      description: The group name to unsuppress. When provided without entity_id, all entities in the group are unsuppressed.
+      required: false
+      selector:
+        text:

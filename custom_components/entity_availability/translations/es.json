@@ -1,0 +1,82 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Crear grupo de entidades",
+        "description": "Cree un grupo de entidades para supervisar su disponibilidad.",
+        "data": {
+          "group_name": "Nombre del grupo",
+          "entities": "Entidades a supervisar"
+        }
+      },
+      "monitoring": {
+        "title": "Ajustes de supervisión",
+        "description": "Configure cómo se supervisan las entidades.",
+        "data": {
+          "bad_states": "Estados considerados sin conexión",
+          "cooldown": "Tiempo de espera antes de marcar sin conexión",
+          "staleness_threshold": "Umbral de obsolescencia"
+        },
+        "data_description": {
+          "bad_states": "Estados de entidad que indican que una entidad está sin conexión (p. ej., no disponible, desconocido).",
+          "cooldown": "Cuánto tiempo (en segundos) debe permanecer una entidad en un estado malo antes de marcarla sin conexión. Previene falsas alarmas por desconexiones breves.",
+          "staleness_threshold": "Si una entidad no ha cambiado de estado durante este número de minutos, marcarla como degradada. Esto detecta entidades que informan 'disponible' pero que en realidad han dejado de enviar datos. Establecer en 0 para desactivar."
+        }
+      },
+      "advanced": {
+        "title": "Ajustes avanzados",
+        "description": "Funciones opcionales de supervisión avanzada.",
+        "data": {
+          "battery_threshold": "Umbral de batería baja (%, 0 = desactivado)",
+          "availability_windows": "Ventanas de seguimiento de disponibilidad"
+        }
+      },
+      "battery_mapping": {
+        "title": "Asignación de entidades de batería",
+        "description": "Confirme o cambie el sensor de batería para cada entidad supervisada. Deje vacío para entidades sin batería. Admite estados numéricos (%) y de texto ('bajo')."
+      }
+    },
+    "error": {
+      "empty_group_name": "El nombre del grupo no puede estar vacío.",
+      "no_entities": "Debe seleccionar al menos una entidad."
+    },
+    "abort": {
+      "already_configured": "Ya existe un grupo con este nombre."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Editar grupo de entidades",
+        "description": "Modificar los ajustes de supervisión para este grupo.",
+        "data": {
+          "entities": "Entidades a supervisar",
+          "bad_states": "Estados considerados sin conexión",
+          "cooldown": "Tiempo de espera (segundos)",
+          "staleness_threshold": "Umbral de obsolescencia (minutos, 0 = desactivado)",
+          "battery_threshold": "Umbral de batería baja (%, 0 = desactivado)",
+          "availability_windows": "Ventanas de seguimiento de disponibilidad"
+        }
+      },
+      "battery_mapping": {
+        "title": "Asignación de entidades de batería",
+        "description": "Confirme o cambie el sensor de batería para cada entidad supervisada. Deje vacío para entidades sin batería. Admite estados numéricos (%) y de texto ('bajo')."
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "offline_count": { "name": "Cantidad sin conexión" },
+      "offline_entities": { "name": "Entidades sin conexión" },
+      "low_battery": { "name": "Batería baja" },
+      "group_summary": { "name": "Resumen del grupo" },
+      "availability_today": { "name": "Disponibilidad (Hoy)" },
+      "availability_3d": { "name": "Disponibilidad (3 días)" },
+      "availability_5d": { "name": "Disponibilidad (5 días)" },
+      "availability_7d": { "name": "Disponibilidad (7 días)" }
+    },
+    "binary_sensor": {
+      "any_offline": { "name": "Alguno sin conexión" }
+    }
+  }
+}

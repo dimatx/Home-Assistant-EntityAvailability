@@ -1,0 +1,82 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Entiteitsgroep aanmaken",
+        "description": "Maak een groep entiteiten aan om de beschikbaarheid te bewaken.",
+        "data": {
+          "group_name": "Groepsnaam",
+          "entities": "Te bewaken entiteiten"
+        }
+      },
+      "monitoring": {
+        "title": "Bewakingsinstellingen",
+        "description": "Configureer hoe entiteiten worden bewaakt.",
+        "data": {
+          "bad_states": "Statussen die als offline worden beschouwd",
+          "cooldown": "Wachttijd voordat offline wordt gemarkeerd",
+          "staleness_threshold": "Inactiviteitsdrempel"
+        },
+        "data_description": {
+          "bad_states": "Entiteitsstatussen die aangeven dat een entiteit offline is (bijv. niet beschikbaar, onbekend).",
+          "cooldown": "Hoe lang (in seconden) een entiteit in een slechte status moet blijven voordat deze als offline wordt gemarkeerd. Voorkomt vals alarm door korte onderbrekingen.",
+          "staleness_threshold": "Als een entiteit gedurende dit aantal minuten niet van status is veranderd, markeer deze als verslechterd. Dit detecteert entiteiten die 'beschikbaar' melden maar geen gegevens meer verzenden. Stel in op 0 om uit te schakelen."
+        }
+      },
+      "advanced": {
+        "title": "Geavanceerde instellingen",
+        "description": "Optionele geavanceerde bewakingsfuncties.",
+        "data": {
+          "battery_threshold": "Drempel lage batterij (%, 0 = uitgeschakeld)",
+          "availability_windows": "Beschikbaarheid-trackingvensters"
+        }
+      },
+      "battery_mapping": {
+        "title": "Batterijsensor-toewijzing",
+        "description": "Bevestig of wijzig de batterijsensor voor elke bewaakte entiteit. Laat leeg voor entiteiten zonder batterij. Ondersteunt numerieke (%) en tekststatussen ('low')."
+      }
+    },
+    "error": {
+      "empty_group_name": "Groepsnaam mag niet leeg zijn.",
+      "no_entities": "Je moet minstens één entiteit selecteren."
+    },
+    "abort": {
+      "already_configured": "Een groep met deze naam bestaat al."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Entiteitsgroep bewerken",
+        "description": "Wijzig de bewakingsinstellingen voor deze groep.",
+        "data": {
+          "entities": "Te bewaken entiteiten",
+          "bad_states": "Statussen die als offline worden beschouwd",
+          "cooldown": "Wachttijd (seconden)",
+          "staleness_threshold": "Inactiviteitsdrempel (minuten, 0 = uitgeschakeld)",
+          "battery_threshold": "Drempel lage batterij (%, 0 = uitgeschakeld)",
+          "availability_windows": "Beschikbaarheid-trackingvensters"
+        }
+      },
+      "battery_mapping": {
+        "title": "Batterijsensor-toewijzing",
+        "description": "Bevestig of wijzig de batterijsensor voor elke bewaakte entiteit. Laat leeg voor entiteiten zonder batterij. Ondersteunt numerieke (%) en tekststatussen ('low')."
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "offline_count": { "name": "Aantal offline" },
+      "offline_entities": { "name": "Offline entiteiten" },
+      "low_battery": { "name": "Lage batterij" },
+      "group_summary": { "name": "Groepsoverzicht" },
+      "availability_today": { "name": "Beschikbaarheid (vandaag)" },
+      "availability_3d": { "name": "Beschikbaarheid (3 dagen)" },
+      "availability_5d": { "name": "Beschikbaarheid (5 dagen)" },
+      "availability_7d": { "name": "Beschikbaarheid (7 dagen)" }
+    },
+    "binary_sensor": {
+      "any_offline": { "name": "Eentje offline" }
+    }
+  }
+}

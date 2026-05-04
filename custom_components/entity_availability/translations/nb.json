@@ -1,0 +1,82 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Opprett entitetsgruppe",
+        "description": "Opprett en gruppe med entiteter for tilgjengelighetsovervåking.",
+        "data": {
+          "group_name": "Gruppenavn",
+          "entities": "Entiteter å overvåke"
+        }
+      },
+      "monitoring": {
+        "title": "Overvåkingsinnstillinger",
+        "description": "Konfigurer hvordan entiteter overvåkes.",
+        "data": {
+          "bad_states": "Tilstander ansett som offline",
+          "cooldown": "Ventetid før markering som offline",
+          "staleness_threshold": "Inaktivitetsterskel"
+        },
+        "data_description": {
+          "bad_states": "Entitetstilstander som indikerer at en entitet er offline (f.eks. utilgjengelig, ukjent).",
+          "cooldown": "Hvor lenge (i sekunder) en entitet må forbli i en dårlig tilstand før den markeres som offline. Forhindrer falske alarmer fra korte avbrudd.",
+          "staleness_threshold": "Hvis en entitet ikke har endret tilstand på dette antallet minutter, merk den som degradert. Dette fanger opp entiteter som rapporterer 'tilgjengelig' men som faktisk har sluttet å sende data. Sett til 0 for å deaktivere."
+        }
+      },
+      "advanced": {
+        "title": "Avanserte innstillinger",
+        "description": "Valgfrie avanserte overvåkingsfunksjoner.",
+        "data": {
+          "battery_threshold": "Grense for lavt batteri (%, 0 = deaktivert)",
+          "availability_windows": "Tilgjengelighetssporingsvinduer"
+        }
+      },
+      "battery_mapping": {
+        "title": "Batterientitetstilordning",
+        "description": "Bekreft eller endre batterisensoren for hver overvåkede entitet. La stå tom for entiteter uten batterier. Støtter numeriske (%) og teksttilstander ('low')."
+      }
+    },
+    "error": {
+      "empty_group_name": "Gruppenavnet kan ikke være tomt.",
+      "no_entities": "Du må velge minst én entitet."
+    },
+    "abort": {
+      "already_configured": "En gruppe med dette navnet finnes allerede."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Rediger entitetsgruppe",
+        "description": "Endre overvåkingsinnstillinger for denne gruppen.",
+        "data": {
+          "entities": "Entiteter å overvåke",
+          "bad_states": "Tilstander ansett som offline",
+          "cooldown": "Ventetid (sekunder)",
+          "staleness_threshold": "Inaktivitetsterskel (minutter, 0 = deaktivert)",
+          "battery_threshold": "Grense for lavt batteri (%, 0 = deaktivert)",
+          "availability_windows": "Tilgjengelighetssporingsvinduer"
+        }
+      },
+      "battery_mapping": {
+        "title": "Batterientitetstilordning",
+        "description": "Bekreft eller endre batterisensoren for hver overvåkede entitet. La stå tom for entiteter uten batterier. Støtter numeriske (%) og teksttilstander ('low')."
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "offline_count": { "name": "Antall offline" },
+      "offline_entities": { "name": "Offline-entiteter" },
+      "low_battery": { "name": "Lavt batteri" },
+      "group_summary": { "name": "Gruppeoppsummering" },
+      "availability_today": { "name": "Tilgjengelighet (i dag)" },
+      "availability_3d": { "name": "Tilgjengelighet (3 dager)" },
+      "availability_5d": { "name": "Tilgjengelighet (5 dager)" },
+      "availability_7d": { "name": "Tilgjengelighet (7 dager)" }
+    },
+    "binary_sensor": {
+      "any_offline": { "name": "Noen offline" }
+    }
+  }
+}
