@@ -1,4 +1,5 @@
 """Tests for Entity Availability services."""
+
 from __future__ import annotations
 
 import logging
@@ -10,7 +11,9 @@ import pytest
 from homeassistant.core import HomeAssistant
 
 from custom_components.entity_availability.const import DOMAIN
-from custom_components.entity_availability.coordinator import EntityAvailabilityCoordinator
+from custom_components.entity_availability.coordinator import (
+    EntityAvailabilityCoordinator,
+)
 from custom_components.entity_availability.models import DeviceState
 from custom_components.entity_availability.services import (
     ATTR_DURATION,
@@ -110,9 +113,7 @@ async def test_unsuppress_service(setup_services) -> None:
     assert device_b.suppress_until is None
 
 
-async def test_suppress_entity_not_found_logs_warning(
-    setup_services, caplog
-) -> None:
+async def test_suppress_entity_not_found_logs_warning(setup_services, caplog) -> None:
     """Test warning logged when entity not in any group."""
     hass, coord = setup_services
 
@@ -127,9 +128,7 @@ async def test_suppress_entity_not_found_logs_warning(
     assert "not found in any monitored group" in caplog.text
 
 
-async def test_unsuppress_entity_not_found_logs_warning(
-    setup_services, caplog
-) -> None:
+async def test_unsuppress_entity_not_found_logs_warning(setup_services, caplog) -> None:
     """Test warning logged when unsuppressing unknown entity."""
     hass, coord = setup_services
 

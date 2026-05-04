@@ -1,4 +1,5 @@
 """Services for Entity Availability."""
+
 from __future__ import annotations
 
 import logging
@@ -78,9 +79,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             if entity_id in coordinator.monitored_entities:
                 coordinator.suppress_entity(entity_id, until)
                 coordinator.async_set_updated_data(coordinator.data)
-                _LOGGER.info(
-                    "Suppressed %s until %s", entity_id, until.isoformat()
-                )
+                _LOGGER.info("Suppressed %s until %s", entity_id, until.isoformat())
                 return
 
         _LOGGER.warning("Entity %s not found in any monitored group", entity_id)
@@ -124,8 +123,6 @@ async def async_setup_services(hass: HomeAssistant) -> None:
     hass.services.async_register(
         DOMAIN, SERVICE_UNSUPPRESS, handle_unsuppress, schema=UNSUPPRESS_SCHEMA
     )
-
-
 
 
 @callback

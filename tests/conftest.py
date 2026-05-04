@@ -1,4 +1,5 @@
 """Shared fixtures for Entity Availability tests."""
+
 from __future__ import annotations
 
 from typing import Any

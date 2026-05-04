@@ -1,4 +1,5 @@
 """Availability storage using 5-minute buckets."""
+
 from __future__ import annotations
 
 import logging
@@ -39,9 +40,7 @@ class AvailabilityStorage:
         minute = (now.minute // 5) * 5
         return now.replace(minute=minute, second=0, microsecond=0)
 
-    def get_or_create_bucket(
-        self, entity_id: str, now: datetime
-    ) -> AvailabilityBucket:
+    def get_or_create_bucket(self, entity_id: str, now: datetime) -> AvailabilityBucket:
         """Get the current interval's bucket, creating it if needed."""
         if entity_id not in self._buckets:
             self._buckets[entity_id] = []
@@ -74,7 +73,9 @@ class AvailabilityStorage:
             return
         self.get_or_create_bucket(entity_id, now)
 
-    def get_availability(self, entity_id: str, window: str, now: datetime) -> float | None:
+    def get_availability(
+        self, entity_id: str, window: str, now: datetime
+    ) -> float | None:
         """Calculate availability % for a time window.
 
         Returns None if insufficient data.

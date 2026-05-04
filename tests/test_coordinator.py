@@ -1,4 +1,5 @@
 """Tests for the Entity Availability coordinator."""
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -20,28 +21,33 @@ from custom_components.entity_availability.const import (
     DEFAULT_STALENESS_THRESHOLD,
     DOMAIN,
 )
-from custom_components.entity_availability.coordinator import EntityAvailabilityCoordinator
+from custom_components.entity_availability.coordinator import (
+    EntityAvailabilityCoordinator,
+)
 
 
 @pytest.fixture
-def coordinator(hass: HomeAssistant, mock_config_entry) -> EntityAvailabilityCoordinator:
+def coordinator(
+    hass: HomeAssistant, mock_config_entry
+) -> EntityAvailabilityCoordinator:
     """Create a coordinator with mocked storage."""
-    with patch.object(
-        EntityAvailabilityCoordinator,
-        "_async_load_storage",
-        new_callable=AsyncMock,
-    ), patch.object(
-        EntityAvailabilityCoordinator,
-        "_async_save_storage",
-        new_callable=AsyncMock,
+    with (
+        patch.object(
+            EntityAvailabilityCoordinator,
+            "_async_load_storage",
+            new_callable=AsyncMock,
+        ),
+        patch.object(
+            EntityAvailabilityCoordinator,
+            "_async_save_storage",
+            new_callable=AsyncMock,
+        ),
     ):
         coord = EntityAvailabilityCoordinator(hass, mock_config_entry)
     return coord
 
 
-async def test_coordinator_init(
-    hass: HomeAssistant, mock_config_entry
-) -> None:
+async def test_coordinator_init(hass: HomeAssistant, mock_config_entry) -> None:
     """Test coordinator initializes with correct config values."""
     coord = EntityAvailabilityCoordinator(hass, mock_config_entry)
     assert coord.monitored_entities == [
@@ -150,9 +156,7 @@ async def test_device_recovery_after_offline(
         assert device_a.cooldown_start is None
 
 
-async def test_staleness_detection(
-    mock_hass: HomeAssistant, mock_config_data
-) -> None:
+async def test_staleness_detection(mock_hass: HomeAssistant, mock_config_data) -> None:
     """Test that stale devices are detected as degraded."""
     hass = mock_hass
     # Override staleness threshold to 10 minutes
@@ -275,9 +279,7 @@ async def test_suppression_skips_availability_tracking(
         assert device_a.is_suppressed is True
 
 
-async def test_suppression_expiry(
-    mock_hass: HomeAssistant, mock_config_entry
-) -> None:
+async def test_suppression_expiry(mock_hass: HomeAssistant, mock_config_entry) -> None:
     """Test that suppression expires when time is reached."""
     hass = mock_hass
 
@@ -341,9 +343,7 @@ async def test_suppress_nonexistent_entity(
         coord.unsuppress_entity("sensor.does_not_exist")
 
 
-async def test_state_none_is_bad(
-    mock_hass: HomeAssistant, mock_config_data
-) -> None:
+async def test_state_none_is_bad(mock_hass: HomeAssistant, mock_config_data) -> None:
     """Test that entity with no state (None) is considered bad."""
     hass = mock_hass
     # Add an entity to the config that doesn't exist in states
@@ -415,13 +415,17 @@ async def test_battery_detection_from_device_registry(
     mock_bat_entry.original_device_class = "battery"
     mock_bat_entry.device_class = "battery"
 
-    with patch.object(
-        EntityAvailabilityCoordinator, "_async_save_storage", new_callable=AsyncMock
-    ), patch(
-        "custom_components.entity_availability.coordinator.er.async_get"
-    ) as mock_er, patch(
-        "custom_components.entity_availability.coordinator.er.async_entries_for_device"
-    ) as mock_entries:
+    with (
+        patch.object(
+            EntityAvailabilityCoordinator, "_async_save_storage", new_callable=AsyncMock
+        ),
+        patch(
+            "custom_components.entity_availability.coordinator.er.async_get"
+        ) as mock_er,
+        patch(
+            "custom_components.entity_availability.coordinator.er.async_entries_for_device"
+        ) as mock_entries,
+    ):
         mock_ent_reg = MagicMock()
         mock_ent_reg.async_get.return_value = mock_ent_entry
         mock_er.return_value = mock_ent_reg

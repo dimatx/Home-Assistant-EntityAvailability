@@ -1,4 +1,5 @@
 """Sensor platform for Entity Availability."""
+
 from __future__ import annotations
 
 import logging
@@ -45,7 +46,9 @@ async def async_setup_entry(
         GroupSummarySensor(coordinator, group_name, group_slug, entry.entry_id),
     ]
 
-    battery_threshold = entry.data.get(CONF_BATTERY_THRESHOLD, DEFAULT_BATTERY_THRESHOLD)
+    battery_threshold = entry.data.get(
+        CONF_BATTERY_THRESHOLD, DEFAULT_BATTERY_THRESHOLD
+    )
     if battery_threshold > 0:
         entities.append(
             DegradedDevicesSensor(coordinator, group_name, group_slug, entry.entry_id)
@@ -53,7 +56,9 @@ async def async_setup_entry(
 
     for window in windows:
         entities.append(
-            AvailabilitySensor(coordinator, group_name, group_slug, window, entry.entry_id)
+            AvailabilitySensor(
+                coordinator, group_name, group_slug, window, entry.entry_id
+            )
         )
 
     async_add_entities(entities)
@@ -69,7 +74,9 @@ def _device_info(entry_id: str, group_slug: str, group_name: str) -> DeviceInfo:
     )
 
 
-class OfflineCountSensor(CoordinatorEntity[EntityAvailabilityCoordinator], SensorEntity):
+class OfflineCountSensor(
+    CoordinatorEntity[EntityAvailabilityCoordinator], SensorEntity
+):
     """Sensor showing count of offline devices in the group."""
 
     _attr_icon = "mdi:alert-circle"
@@ -105,7 +112,9 @@ class OfflineCountSensor(CoordinatorEntity[EntityAvailabilityCoordinator], Senso
             d.entity_id: {
                 "offline": d.is_offline,
                 "since": d.offline_since.isoformat() if d.offline_since else None,
-                "last_recovery": d.last_recovery.isoformat() if d.last_recovery else None,
+                "last_recovery": d.last_recovery.isoformat()
+                if d.last_recovery
+                else None,
                 "last_downtime_seconds": d.last_downtime_seconds,
             }
             for d in self.coordinator.device_states.values()
@@ -113,7 +122,9 @@ class OfflineCountSensor(CoordinatorEntity[EntityAvailabilityCoordinator], Senso
         }
 
 
-class OfflineDevicesSensor(CoordinatorEntity[EntityAvailabilityCoordinator], SensorEntity):
+class OfflineDevicesSensor(
+    CoordinatorEntity[EntityAvailabilityCoordinator], SensorEntity
+):
     """Sensor showing comma-separated list of offline entity names."""
 
     _attr_icon = "mdi:devices"
@@ -165,7 +176,9 @@ class OfflineDevicesSensor(CoordinatorEntity[EntityAvailabilityCoordinator], Sen
         return entity_id.split(".")[-1].replace("_", " ").title()
 
 
-class DegradedDevicesSensor(CoordinatorEntity[EntityAvailabilityCoordinator], SensorEntity):
+class DegradedDevicesSensor(
+    CoordinatorEntity[EntityAvailabilityCoordinator], SensorEntity
+):
     """Sensor showing devices with low battery."""
 
     _attr_icon = "mdi:battery-alert"
@@ -218,7 +231,9 @@ class DegradedDevicesSensor(CoordinatorEntity[EntityAvailabilityCoordinator], Se
         return f"{name} ({device.battery_level}%)"
 
 
-class AvailabilitySensor(CoordinatorEntity[EntityAvailabilityCoordinator], SensorEntity):
+class AvailabilitySensor(
+    CoordinatorEntity[EntityAvailabilityCoordinator], SensorEntity
+):
     """Sensor showing group availability % for a time window."""
 
     _attr_icon = "mdi:chart-line"
@@ -277,7 +292,9 @@ class AvailabilitySensor(CoordinatorEntity[EntityAvailabilityCoordinator], Senso
         return {"per_device": breakdown}
 
 
-class GroupSummarySensor(CoordinatorEntity[EntityAvailabilityCoordinator], SensorEntity):
+class GroupSummarySensor(
+    CoordinatorEntity[EntityAvailabilityCoordinator], SensorEntity
+):
     """Sensor showing total entity count with detailed breakdown in attributes."""
 
     _attr_icon = "mdi:format-list-group"

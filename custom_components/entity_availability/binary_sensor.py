@@ -1,4 +1,5 @@
 """Binary sensor platform for Entity Availability."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -27,12 +28,16 @@ async def async_setup_entry(
     group_name = entry.data[CONF_GROUP_NAME]
     group_slug = group_name.lower().replace(" ", "_")
 
-    async_add_entities([
-        AnyOfflineBinarySensor(coordinator, group_name, group_slug, entry.entry_id),
-    ])
+    async_add_entities(
+        [
+            AnyOfflineBinarySensor(coordinator, group_name, group_slug, entry.entry_id),
+        ]
+    )
 
 
-class AnyOfflineBinarySensor(CoordinatorEntity[EntityAvailabilityCoordinator], BinarySensorEntity):
+class AnyOfflineBinarySensor(
+    CoordinatorEntity[EntityAvailabilityCoordinator], BinarySensorEntity
+):
     """Binary sensor: ON when at least one entity is offline (problem detected)."""
 
     _attr_device_class = BinarySensorDeviceClass.PROBLEM

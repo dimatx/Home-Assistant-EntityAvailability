@@ -1,4 +1,5 @@
 """Tests for the Entity Availability config flow."""
+
 from __future__ import annotations
 
 from unittest.mock import patch
@@ -286,7 +287,9 @@ async def test_options_flow(hass: HomeAssistant, mock_config_entry) -> None:
     assert mock_config_entry.data[CONF_BATTERY_ENTITY_MAP] == {}
 
 
-async def test_options_flow_with_battery_mapping(hass: HomeAssistant, mock_config_entry) -> None:
+async def test_options_flow_with_battery_mapping(
+    hass: HomeAssistant, mock_config_entry
+) -> None:
     """Test options flow with battery threshold > 0 shows battery mapping."""
     mock_config_entry.add_to_hass(hass)
 

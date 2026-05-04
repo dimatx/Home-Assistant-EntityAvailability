@@ -1,4 +1,5 @@
 """Tests for Entity Availability sensor entities."""
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -9,7 +10,9 @@ import pytest
 from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
 
-from custom_components.entity_availability.coordinator import EntityAvailabilityCoordinator
+from custom_components.entity_availability.coordinator import (
+    EntityAvailabilityCoordinator,
+)
 from custom_components.entity_availability.models import DeviceState
 from custom_components.entity_availability.sensor import (
     AvailabilitySensor,
@@ -51,37 +54,47 @@ class TestOfflineCountSensor:
 
     def test_native_value_counts_offline(self, mock_coordinator, mock_hass):
         """Test native_value returns count of offline non-suppressed devices."""
-        sensor = OfflineCountSensor(mock_coordinator, "Test Group", "test_group", "test_entry_id")
+        sensor = OfflineCountSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
         sensor.hass = mock_hass
         assert sensor.native_value == 1
 
     def test_native_value_excludes_suppressed(self, mock_coordinator, mock_hass):
         """Test that suppressed devices are not counted."""
         mock_coordinator._device_states["binary_sensor.device_b"].is_suppressed = True
-        sensor = OfflineCountSensor(mock_coordinator, "Test Group", "test_group", "test_entry_id")
+        sensor = OfflineCountSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
         sensor.hass = mock_hass
         assert sensor.native_value == 0
 
     def test_native_value_zero_when_all_online(self, mock_coordinator, mock_hass):
         """Test zero offline count when all devices are online."""
         mock_coordinator._device_states["binary_sensor.device_b"].is_offline = False
-        sensor = OfflineCountSensor(mock_coordinator, "Test Group", "test_group", "test_entry_id")
+        sensor = OfflineCountSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
         sensor.hass = mock_hass
         assert sensor.native_value == 0
 
     def test_native_value_counts_multiple_offline(self, mock_coordinator, mock_hass):
         """Test counting multiple offline devices."""
         mock_coordinator._device_states["binary_sensor.device_a"].is_offline = True
-        mock_coordinator._device_states["binary_sensor.device_a"].offline_since = (
-            datetime.now(timezone.utc)
+        mock_coordinator._device_states[
+            "binary_sensor.device_a"
+        ].offline_since = datetime.now(timezone.utc)
+        sensor = OfflineCountSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
         )
-        sensor = OfflineCountSensor(mock_coordinator, "Test Group", "test_group", "test_entry_id")
         sensor.hass = mock_hass
         assert sensor.native_value == 2
 
     def test_extra_state_attributes(self, mock_coordinator, mock_hass):
         """Test extra attributes contain offline device info."""
-        sensor = OfflineCountSensor(mock_coordinator, "Test Group", "test_group", "test_entry_id")
+        sensor = OfflineCountSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
         sensor.hass = mock_hass
         attrs = sensor.extra_state_attributes
         assert "binary_sensor.device_b" in attrs
@@ -89,7 +102,9 @@ class TestOfflineCountSensor:
 
     def test_unique_id(self, mock_coordinator, mock_hass):
         """Test unique_id format."""
-        sensor = OfflineCountSensor(mock_coordinator, "Test Group", "test_group", "test_entry_id")
+        sensor = OfflineCountSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
         assert sensor.unique_id == "test_entry_id_offline_count"
 
 
@@ -98,7 +113,9 @@ class TestOfflineDevicesSensor:
 
     def test_native_value_shows_friendly_names(self, mock_coordinator, mock_hass):
         """Test that friendly names are shown for offline devices."""
-        sensor = OfflineDevicesSensor(mock_coordinator, "Test Group", "test_group", "test_entry_id")
+        sensor = OfflineDevicesSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
         sensor.hass = mock_hass
         # device_b is offline and has friendly_name "Device B"
         assert sensor.native_value == "Device B"
@@ -106,7 +123,9 @@ class TestOfflineDevicesSensor:
     def test_native_value_none_when_all_online(self, mock_coordinator, mock_hass):
         """Test 'None' string when no devices offline."""
         mock_coordinator._device_states["binary_sensor.device_b"].is_offline = False
-        sensor = OfflineDevicesSensor(mock_coordinator, "Test Group", "test_group", "test_entry_id")
+        sensor = OfflineDevicesSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
         sensor.hass = mock_hass
         assert sensor.native_value == "None"
 
@@ -120,12 +139,15 @@ class TestOfflineDevicesSensor:
                 is_offline=True,
             )
             mock_hass.states.async_set(
-                entity_id, STATE_UNAVAILABLE,
+                entity_id,
+                STATE_UNAVAILABLE,
                 {"friendly_name": f"Very Long Device Name Number {i:03d}"},
             )
 
         # Add entity to monitored list so it's accessible
-        sensor = OfflineDevicesSensor(mock_coordinator, "Test Group", "test_group", "test_entry_id")
+        sensor = OfflineDevicesSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
         sensor.hass = mock_hass
         value = sensor.native_value
         assert len(value) <= MAX_STATE_LENGTH
@@ -134,7 +156,9 @@ class TestOfflineDevicesSensor:
     def test_native_value_excludes_suppressed(self, mock_coordinator, mock_hass):
         """Test suppressed devices excluded from list."""
         mock_coordinator._device_states["binary_sensor.device_b"].is_suppressed = True
-        sensor = OfflineDevicesSensor(mock_coordinator, "Test Group", "test_group", "test_entry_id")
+        sensor = OfflineDevicesSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
         sensor.hass = mock_hass
         assert sensor.native_value == "None"
 
@@ -142,7 +166,9 @@ class TestOfflineDevicesSensor:
         self, mock_coordinator, mock_hass
     ):
         """Test extra attributes contain full entity list."""
-        sensor = OfflineDevicesSensor(mock_coordinator, "Test Group", "test_group", "test_entry_id")
+        sensor = OfflineDevicesSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
         sensor.hass = mock_hass
         attrs = sensor.extra_state_attributes
         assert "entities" in attrs
@@ -154,7 +180,9 @@ class TestOfflineDevicesSensor:
         """Test fallback friendly name when no friendly_name attribute."""
         # Remove the state so it falls back to entity_id parsing
         mock_hass.states.async_remove("binary_sensor.device_b")
-        sensor = OfflineDevicesSensor(mock_coordinator, "Test Group", "test_group", "test_entry_id")
+        sensor = OfflineDevicesSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
         sensor.hass = mock_hass
         # Fallback: entity_id.split(".")[-1].replace("_", " ").title()
         assert sensor.native_value == "Device B"
@@ -167,13 +195,17 @@ class TestDegradedDevicesSensor:
         """Test native_value returns low battery device names."""
         mock_coordinator._device_states["binary_sensor.device_a"].is_degraded = True
         mock_coordinator._device_states["binary_sensor.device_a"].battery_level = 15
-        sensor = DegradedDevicesSensor(mock_coordinator, "Test Group", "test_group", "test_entry_id")
+        sensor = DegradedDevicesSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
         sensor.hass = mock_hass
         assert "Device A (15%)" in sensor.native_value
 
     def test_native_value_empty_when_none_degraded(self, mock_coordinator, mock_hass):
         """Test empty string when no devices degraded."""
-        sensor = DegradedDevicesSensor(mock_coordinator, "Test Group", "test_group", "test_entry_id")
+        sensor = DegradedDevicesSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
         sensor.hass = mock_hass
         assert sensor.native_value == ""
 
@@ -182,7 +214,9 @@ class TestDegradedDevicesSensor:
         mock_coordinator._device_states["binary_sensor.device_a"].is_degraded = True
         mock_coordinator._device_states["binary_sensor.device_a"].battery_level = 10
         mock_coordinator._device_states["binary_sensor.device_a"].is_suppressed = True
-        sensor = DegradedDevicesSensor(mock_coordinator, "Test Group", "test_group", "test_entry_id")
+        sensor = DegradedDevicesSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
         sensor.hass = mock_hass
         assert sensor.native_value == ""
 
@@ -190,7 +224,9 @@ class TestDegradedDevicesSensor:
         """Test that battery levels are reported in attributes."""
         mock_coordinator._device_states["binary_sensor.device_a"].is_degraded = True
         mock_coordinator._device_states["binary_sensor.device_a"].battery_level = 15
-        sensor = DegradedDevicesSensor(mock_coordinator, "Test Group", "test_group", "test_entry_id")
+        sensor = DegradedDevicesSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
         sensor.hass = mock_hass
         attrs = sensor.extra_state_attributes
         assert "devices" in attrs
@@ -272,14 +308,18 @@ class TestGroupSummarySensor:
 
     def test_native_value_is_total_count(self, mock_coordinator, mock_hass):
         """Test native_value returns total entity count."""
-        sensor = GroupSummarySensor(mock_coordinator, "Test Group", "test_group", "test_entry_id")
+        sensor = GroupSummarySensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
         sensor.hass = mock_hass
         assert sensor.native_value == 3
 
     def test_attributes_breakdown(self, mock_coordinator, mock_hass):
         """Test extra attributes contain full breakdown."""
         mock_coordinator._device_states["binary_sensor.device_a"].battery_level = 85
-        sensor = GroupSummarySensor(mock_coordinator, "Test Group", "test_group", "test_entry_id")
+        sensor = GroupSummarySensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
         sensor.hass = mock_hass
         attrs = sensor.extra_state_attributes
         assert attrs["total_entities"] == 3
@@ -292,7 +332,9 @@ class TestGroupSummarySensor:
     def test_attributes_with_suppressed(self, mock_coordinator, mock_hass):
         """Test that suppressed entities are counted correctly."""
         mock_coordinator._device_states["binary_sensor.device_c"].is_suppressed = True
-        sensor = GroupSummarySensor(mock_coordinator, "Test Group", "test_group", "test_entry_id")
+        sensor = GroupSummarySensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
         sensor.hass = mock_hass
         attrs = sensor.extra_state_attributes
         assert attrs["suppressed"] == 1
@@ -302,7 +344,9 @@ class TestGroupSummarySensor:
         """Test low battery count in attributes."""
         mock_coordinator._device_states["binary_sensor.device_a"].is_degraded = True
         mock_coordinator._device_states["binary_sensor.device_a"].battery_level = 10
-        sensor = GroupSummarySensor(mock_coordinator, "Test Group", "test_group", "test_entry_id")
+        sensor = GroupSummarySensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
         sensor.hass = mock_hass
         attrs = sensor.extra_state_attributes
         assert attrs["low_battery"] == 1
@@ -310,5 +354,7 @@ class TestGroupSummarySensor:
 
     def test_unique_id(self, mock_coordinator, mock_hass):
         """Test unique_id format."""
-        sensor = GroupSummarySensor(mock_coordinator, "Test Group", "test_group", "test_entry_id")
+        sensor = GroupSummarySensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
         assert sensor.unique_id == "test_entry_id_group_summary"

@@ -1,4 +1,5 @@
 """The Entity Availability integration."""
+
 from __future__ import annotations
 
 import logging
@@ -61,11 +62,18 @@ async def _async_register_card(hass: HomeAssistant) -> None:
 
     if not card_path.exists():
         card_path = (
-            Path(__file__).resolve().parent.parent.parent / "dist" / "entity-availability-card.js"
+            Path(__file__).resolve().parent.parent.parent
+            / "dist"
+            / "entity-availability-card.js"
         )
 
     if not card_path.exists():
-        card_path = Path(hass.config.path("www")) / "community" / DOMAIN / "entity-availability-card.js"
+        card_path = (
+            Path(hass.config.path("www"))
+            / "community"
+            / DOMAIN
+            / "entity-availability-card.js"
+        )
 
     if not card_path.exists():
         card_path = Path(hass.config.path("www")) / "entity-availability-card.js"
@@ -109,9 +117,7 @@ async def _async_register_card(hass: HomeAssistant) -> None:
                 await resources.async_create_item(
                     {"res_type": "module", "url": LOVELACE_CARD_URL}
                 )
-                _LOGGER.info(
-                    "Added entity-availability-card as Lovelace resource"
-                )
+                _LOGGER.info("Added entity-availability-card as Lovelace resource")
         else:
             _LOGGER.debug(
                 "Lovelace resources collection not available (YAML mode?). "

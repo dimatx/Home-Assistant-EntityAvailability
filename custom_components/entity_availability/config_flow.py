@@ -1,4 +1,5 @@
 """Config flow for Entity Availability integration."""
+
 from __future__ import annotations
 
 import logging
@@ -61,7 +62,9 @@ class EntityAvailabilityConfigFlow(ConfigFlow, domain=DOMAIN):
             elif not entities:
                 errors[CONF_ENTITIES] = "no_entities"
             else:
-                await self.async_set_unique_id(f"{DOMAIN}_{group_name.lower().replace(' ', '_')}")
+                await self.async_set_unique_id(
+                    f"{DOMAIN}_{group_name.lower().replace(' ', '_')}"
+                )
                 self._abort_if_unique_id_configured()
 
                 self._data[CONF_GROUP_NAME] = group_name
@@ -132,7 +135,9 @@ class EntityAvailabilityConfigFlow(ConfigFlow, domain=DOMAIN):
         """Step 3: Advanced settings."""
         if user_input is not None:
             self._data[CONF_BATTERY_THRESHOLD] = user_input[CONF_BATTERY_THRESHOLD]
-            self._data[CONF_AVAILABILITY_WINDOWS] = user_input[CONF_AVAILABILITY_WINDOWS]
+            self._data[CONF_AVAILABILITY_WINDOWS] = user_input[
+                CONF_AVAILABILITY_WINDOWS
+            ]
 
             if self._data[CONF_BATTERY_THRESHOLD] > 0:
                 return await self.async_step_battery_mapping()
@@ -187,18 +192,16 @@ class EntityAvailabilityConfigFlow(ConfigFlow, domain=DOMAIN):
         for entity_id in self._data[CONF_ENTITIES]:
             detected = self._detect_battery_entity(entity_id)
             if detected:
-                schema_dict[
-                    vol.Optional(entity_id, default=detected)
-                ] = selector.EntitySelector(
-                    selector.EntitySelectorConfig(
-                        domain="sensor",
-                        device_class="battery",
+                schema_dict[vol.Optional(entity_id, default=detected)] = (
+                    selector.EntitySelector(
+                        selector.EntitySelectorConfig(
+                            domain="sensor",
+                            device_class="battery",
+                        )
                     )
                 )
             else:
-                schema_dict[
-                    vol.Optional(entity_id)
-                ] = selector.EntitySelector(
+                schema_dict[vol.Optional(entity_id)] = selector.EntitySelector(
                     selector.EntitySelectorConfig(
                         domain="sensor",
                         device_class="battery",
@@ -273,7 +276,8 @@ class EntityAvailabilityOptionsFlow(OptionsFlow):
                     selector.EntitySelectorConfig(multiple=True)
                 ),
                 vol.Required(
-                    CONF_BAD_STATES, default=current.get(CONF_BAD_STATES, DEFAULT_BAD_STATES)
+                    CONF_BAD_STATES,
+                    default=current.get(CONF_BAD_STATES, DEFAULT_BAD_STATES),
                 ): selector.SelectSelector(
                     selector.SelectSelectorConfig(
                         options=["unavailable", "unknown"],
@@ -290,7 +294,9 @@ class EntityAvailabilityOptionsFlow(OptionsFlow):
                 ),
                 vol.Required(
                     CONF_STALENESS_THRESHOLD,
-                    default=current.get(CONF_STALENESS_THRESHOLD, DEFAULT_STALENESS_THRESHOLD),
+                    default=current.get(
+                        CONF_STALENESS_THRESHOLD, DEFAULT_STALENESS_THRESHOLD
+                    ),
                 ): selector.NumberSelector(
                     selector.NumberSelectorConfig(
                         min=0, max=1440, step=1, unit_of_measurement="minutes"
@@ -298,7 +304,9 @@ class EntityAvailabilityOptionsFlow(OptionsFlow):
                 ),
                 vol.Required(
                     CONF_BATTERY_THRESHOLD,
-                    default=current.get(CONF_BATTERY_THRESHOLD, DEFAULT_BATTERY_THRESHOLD),
+                    default=current.get(
+                        CONF_BATTERY_THRESHOLD, DEFAULT_BATTERY_THRESHOLD
+                    ),
                 ): selector.NumberSelector(
                     selector.NumberSelectorConfig(
                         min=0, max=100, step=1, unit_of_measurement="%"
@@ -306,7 +314,9 @@ class EntityAvailabilityOptionsFlow(OptionsFlow):
                 ),
                 vol.Required(
                     CONF_AVAILABILITY_WINDOWS,
-                    default=current.get(CONF_AVAILABILITY_WINDOWS, DEFAULT_AVAILABILITY_WINDOWS),
+                    default=current.get(
+                        CONF_AVAILABILITY_WINDOWS, DEFAULT_AVAILABILITY_WINDOWS
+                    ),
                 ): selector.SelectSelector(
                     selector.SelectSelectorConfig(
                         options=AVAILABLE_WINDOWS,
@@ -326,7 +336,9 @@ class EntityAvailabilityOptionsFlow(OptionsFlow):
     ) -> ConfigFlowResult:
         """Battery entity mapping step in options flow."""
         if user_input is not None:
-            entities = self._data.get(CONF_ENTITIES, self.config_entry.data.get(CONF_ENTITIES, []))
+            entities = self._data.get(
+                CONF_ENTITIES, self.config_entry.data.get(CONF_ENTITIES, [])
+            )
             battery_map = {}
             for entity_id in entities:
                 battery_map[entity_id] = user_input.get(entity_id, "")
@@ -337,7 +349,9 @@ class EntityAvailabilityOptionsFlow(OptionsFlow):
             return self.async_create_entry(title="", data={})
 
         existing_map = self.config_entry.data.get(CONF_BATTERY_ENTITY_MAP, {})
-        entities = self._data.get(CONF_ENTITIES, self.config_entry.data.get(CONF_ENTITIES, []))
+        entities = self._data.get(
+            CONF_ENTITIES, self.config_entry.data.get(CONF_ENTITIES, [])
+        )
 
         schema_dict: dict[Any, Any] = {}
         for entity_id in entities:
@@ -345,18 +359,16 @@ class EntityAvailabilityOptionsFlow(OptionsFlow):
             if not default:
                 default = self._detect_battery_entity(entity_id)
             if default:
-                schema_dict[
-                    vol.Optional(entity_id, default=default)
-                ] = selector.EntitySelector(
-                    selector.EntitySelectorConfig(
-                        domain="sensor",
-                        device_class="battery",
+                schema_dict[vol.Optional(entity_id, default=default)] = (
+                    selector.EntitySelector(
+                        selector.EntitySelectorConfig(
+                            domain="sensor",
+                            device_class="battery",
+                        )
                     )
                 )
             else:
-                schema_dict[
-                    vol.Optional(entity_id)
-                ] = selector.EntitySelector(
+                schema_dict[vol.Optional(entity_id)] = selector.EntitySelector(
                     selector.EntitySelectorConfig(
                         domain="sensor",
                         device_class="battery",

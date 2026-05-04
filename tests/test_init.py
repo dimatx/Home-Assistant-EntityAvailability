@@ -1,4 +1,5 @@
 """Tests for Entity Availability integration setup and unload."""
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, patch
@@ -12,7 +13,9 @@ from custom_components.entity_availability import (
     async_unload_entry,
 )
 from custom_components.entity_availability.const import DOMAIN
-from custom_components.entity_availability.coordinator import EntityAvailabilityCoordinator
+from custom_components.entity_availability.coordinator import (
+    EntityAvailabilityCoordinator,
+)
 
 
 async def test_async_setup_entry(mock_hass: HomeAssistant, mock_config_entry) -> None:
@@ -20,18 +23,22 @@ async def test_async_setup_entry(mock_hass: HomeAssistant, mock_config_entry) ->
     hass = mock_hass
     mock_config_entry.add_to_hass(hass)
 
-    with patch.object(
-        EntityAvailabilityCoordinator,
-        "async_config_entry_first_refresh",
-        new_callable=AsyncMock,
-    ) as mock_refresh, patch(
-        "custom_components.entity_availability.async_setup_services",
-        new_callable=AsyncMock,
-    ) as mock_services, patch.object(
-        hass.config_entries,
-        "async_forward_entry_setups",
-        new_callable=AsyncMock,
-    ) as mock_forward:
+    with (
+        patch.object(
+            EntityAvailabilityCoordinator,
+            "async_config_entry_first_refresh",
+            new_callable=AsyncMock,
+        ) as mock_refresh,
+        patch(
+            "custom_components.entity_availability.async_setup_services",
+            new_callable=AsyncMock,
+        ) as mock_services,
+        patch.object(
+            hass.config_entries,
+            "async_forward_entry_setups",
+            new_callable=AsyncMock,
+        ) as mock_forward,
+    ):
         result = await async_setup_entry(hass, mock_config_entry)
 
     assert result is True
@@ -52,17 +59,21 @@ async def test_async_unload_entry(mock_hass: HomeAssistant, mock_config_entry) -
     mock_config_entry.add_to_hass(hass)
 
     # First set up
-    with patch.object(
-        EntityAvailabilityCoordinator,
-        "async_config_entry_first_refresh",
-        new_callable=AsyncMock,
-    ), patch(
-        "custom_components.entity_availability.async_setup_services",
-        new_callable=AsyncMock,
-    ), patch.object(
-        hass.config_entries,
-        "async_forward_entry_setups",
-        new_callable=AsyncMock,
+    with (
+        patch.object(
+            EntityAvailabilityCoordinator,
+            "async_config_entry_first_refresh",
+            new_callable=AsyncMock,
+        ),
+        patch(
+            "custom_components.entity_availability.async_setup_services",
+            new_callable=AsyncMock,
+        ),
+        patch.object(
+            hass.config_entries,
+            "async_forward_entry_setups",
+            new_callable=AsyncMock,
+        ),
     ):
         await async_setup_entry(hass, mock_config_entry)
 
@@ -89,17 +100,21 @@ async def test_async_unload_entry_failure(
     hass = mock_hass
     mock_config_entry.add_to_hass(hass)
 
-    with patch.object(
-        EntityAvailabilityCoordinator,
-        "async_config_entry_first_refresh",
-        new_callable=AsyncMock,
-    ), patch(
-        "custom_components.entity_availability.async_setup_services",
-        new_callable=AsyncMock,
-    ), patch.object(
-        hass.config_entries,
-        "async_forward_entry_setups",
-        new_callable=AsyncMock,
+    with (
+        patch.object(
+            EntityAvailabilityCoordinator,
+            "async_config_entry_first_refresh",
+            new_callable=AsyncMock,
+        ),
+        patch(
+            "custom_components.entity_availability.async_setup_services",
+            new_callable=AsyncMock,
+        ),
+        patch.object(
+            hass.config_entries,
+            "async_forward_entry_setups",
+            new_callable=AsyncMock,
+        ),
     ):
         await async_setup_entry(hass, mock_config_entry)
 
@@ -123,17 +138,21 @@ async def test_setup_creates_coordinator_with_correct_config(
     hass = mock_hass
     mock_config_entry.add_to_hass(hass)
 
-    with patch.object(
-        EntityAvailabilityCoordinator,
-        "async_config_entry_first_refresh",
-        new_callable=AsyncMock,
-    ), patch(
-        "custom_components.entity_availability.async_setup_services",
-        new_callable=AsyncMock,
-    ), patch.object(
-        hass.config_entries,
-        "async_forward_entry_setups",
-        new_callable=AsyncMock,
+    with (
+        patch.object(
+            EntityAvailabilityCoordinator,
+            "async_config_entry_first_refresh",
+            new_callable=AsyncMock,
+        ),
+        patch(
+            "custom_components.entity_availability.async_setup_services",
+            new_callable=AsyncMock,
+        ),
+        patch.object(
+            hass.config_entries,
+            "async_forward_entry_setups",
+            new_callable=AsyncMock,
+        ),
     ):
         await async_setup_entry(hass, mock_config_entry)
 

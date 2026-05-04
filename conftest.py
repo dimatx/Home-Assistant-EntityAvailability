@@ -1,4 +1,5 @@
 """Root conftest - ensures the custom_components directory is importable."""
+
 import sys
 from pathlib import Path
 

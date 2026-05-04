@@ -1,4 +1,5 @@
 """Tests for the Entity Availability storage module."""
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
@@ -55,9 +56,7 @@ class TestBucketCreation:
         assert bucket1 is not bucket2
         assert len(storage._buckets["sensor.test"]) == 2
 
-    def test_bucket_pruning(
-        self, storage: AvailabilityStorage, now: datetime
-    ) -> None:
+    def test_bucket_pruning(self, storage: AvailabilityStorage, now: datetime) -> None:
         """Test that old buckets are pruned beyond max."""
         entity = "sensor.test"
         for i in range(BUCKETS_MAX + 10):
@@ -70,9 +69,7 @@ class TestBucketCreation:
 class TestRecording:
     """Tests for recording online/offline time."""
 
-    def test_record_online(
-        self, storage: AvailabilityStorage, now: datetime
-    ) -> None:
+    def test_record_online(self, storage: AvailabilityStorage, now: datetime) -> None:
         """Test recording online seconds."""
         storage.record_online("sensor.test", 30.0, now)
         bucket = storage.get_or_create_bucket("sensor.test", now)
@@ -210,9 +207,7 @@ class TestWindowCalculation:
             t = now - timedelta(minutes=i * 5)
             storage.record_online("sensor.test", float(BUCKET_INTERVAL), t)
 
-        result = storage.get_entity_availability(
-            "sensor.test", ["today", "7d"], now
-        )
+        result = storage.get_entity_availability("sensor.test", ["today", "7d"], now)
         assert "today" in result
         assert "7d" in result
         assert result["today"] == 100.0

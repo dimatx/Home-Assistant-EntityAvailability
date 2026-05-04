@@ -1,4 +1,5 @@
 """DataUpdateCoordinator for Entity Availability."""
+
 from __future__ import annotations
 
 import logging
@@ -59,7 +60,9 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
         )
         self.entry = entry
         self._entities: list[str] = entry.data.get(CONF_ENTITIES, [])
-        self._bad_states: list[str] = entry.data.get(CONF_BAD_STATES, DEFAULT_BAD_STATES)
+        self._bad_states: list[str] = entry.data.get(
+            CONF_BAD_STATES, DEFAULT_BAD_STATES
+        )
         self._cooldown: int = entry.data.get(CONF_COOLDOWN, DEFAULT_COOLDOWN)
         self._staleness_threshold: int = entry.data.get(
             CONF_STALENESS_THRESHOLD, DEFAULT_STALENESS_THRESHOLD
@@ -229,9 +232,7 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
                 continue
 
             # Determine if device is in a bad state
-            is_bad = (
-                state is None or state.state in self._bad_states
-            )
+            is_bad = state is None or state.state in self._bad_states
 
             # Battery check
             device.battery_level = self._get_battery_level(entity_id)
@@ -309,7 +310,9 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
         # Auto-detection fallback: no map or entity not in map
         state = self.hass.states.get(entity_id)
         if state and state.attributes:
-            battery = state.attributes.get("battery_level") or state.attributes.get("battery")
+            battery = state.attributes.get("battery_level") or state.attributes.get(
+                "battery"
+            )
             if battery is not None:
                 return self._parse_battery_state(str(battery).replace("%", ""))
 
@@ -352,7 +355,11 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
                 ent.device_class == SensorDeviceClass.BATTERY
             ):
                 bat_state = self.hass.states.get(ent.entity_id)
-                if bat_state and bat_state.state not in ("unavailable", "unknown", None):
+                if bat_state and bat_state.state not in (
+                    "unavailable",
+                    "unknown",
+                    None,
+                ):
                     level = self._parse_battery_state(bat_state.state)
                     if level is not None:
                         return level
