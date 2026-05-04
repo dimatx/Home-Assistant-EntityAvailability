@@ -13,7 +13,8 @@ Monitor entity availability across your Home Assistant setup. Track offline enti
 - Battery entities that report `low` (text) are supported in addition to numeric percentages
 - Degraded entity detection — flag entities with low battery or stale data
 - Maintenance/suppression mode — temporarily exclude entities from monitoring
-- Custom Lovelace card — traffic-light status display with at-a-glance health overview
+- Custom Lovelace card — dashboard-style display with status icon, stats, availability bars, entity list, and visual editor
+- Customizable availability bar colors and thresholds
 - Survives HA restarts — history persisted via HA Store, no recorder dependency
 
 ## Setup

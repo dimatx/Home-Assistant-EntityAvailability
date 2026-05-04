@@ -14,15 +14,25 @@ All notable changes to this project will be documented in this file.
 - Battery entity selector shows all sensors (not filtered by device_class)
 - Battery mapping uses suggested values — user can clear selections for non-battery entities
 - Low Battery and Offline Entities sensors show "None" state when no issues (not empty/unknown)
+- Lovelace card completely redesigned with dashboard-style layout
 
 ### Added
 - Battery entity mapping step in config flow — auto-detects and lets user confirm/override
 - Support for text battery states (`low`) in addition to numeric percentages
 - "Any Offline" binary sensor (Problem device class) — ON when any entity is offline
-- Group Summary sensor with total_entities, online, offline, suppressed, battery_powered, low_battery attributes
+- Group Summary sensor with total_entities, online, offline, suppressed, battery_powered, low_battery, entities, battery_levels attributes
 - Low Battery Count sensor — numeric count for easy automation triggers
 - Options flow includes battery mapping step
 - Auto-detection of battery entities via device registry and naming convention
+- Card: status icon (mdi:check-circle / alert-circle / close-circle) colored by group health
+- Card: stats row with Online / Offline / Low Battery counts
+- Card: all configured availability windows shown with colored progress bars
+- Card: customizable bar colors and thresholds via visual editor
+- Card: expandable entity list with legend header, battery %, sorted by severity
+- Card: optional suppress/unsuppress action buttons
+- Card: suppressed entities banner
+- Card: visual card editor with all options configurable
+- Integration icon (icon.png, icon@2x.png) for HACS display
 
 ## [0.1.0] - 2024-12-01
 

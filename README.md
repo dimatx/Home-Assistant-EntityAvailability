@@ -304,32 +304,58 @@ The integration ships with a custom card for quick health visualization. It is a
 
 ```yaml
 type: custom:entity-availability-card
-entity: sensor.entity_availability_security_devices_offline_count
 group: security_devices
 show_availability: true
-show_degraded: true
+show_entities: true
+entities_expanded: false
+show_actions: false
+compact: false
+availability_thresholds:
+  green: 99
+  yellow: 95
+availability_colors:
+  green: "#4caf50"
+  yellow: "#ff9800"
+  red: "#f44336"
 ```
 
+| Option | Default | Description |
+|--------|---------|-------------|
+| `group` | (required) | Group slug (e.g., `security_devices`) |
+| `title` | (auto from group) | Custom card title |
+| `show_availability` | `true` | Show availability progress bars |
+| `show_entities` | `true` | Show expandable entity list |
+| `entities_expanded` | `false` | Start entity list expanded |
+| `show_actions` | `false` | Show Suppress/Unsuppress buttons |
+| `compact` | `false` | Reduced padding mode |
+| `availability_thresholds` | `{green: 99, yellow: 95}` | % thresholds for bar colors |
+| `availability_colors` | `{green, yellow, red}` | Custom hex colors for bars |
+
 The `group` field should be the group slug (e.g., `security_devices`). The card uses the prefix `entity_availability_` + group slug to locate all related entities automatically.
+
+All options are configurable via the visual card editor UI.
 
 ### Card Preview
 
 ```
-+-----------------------------------------------+
-|  Entity Availability - Security               |
-+-----------------------------------------------+
-|                                               |
-|   [=] ALL OK               Availability: 99% |
-|                                               |
-|   Entity      Status                          |
-|   --------    ------                          |
-|   Camera 1    [GREEN ]  Online                |
-|   Camera 2    [GREEN ]  Online                |
-|   Door Lock   [YELLOW]  Low Battery (18%)     |
-|   Sensor 3    [RED   ]  Offline 12m           |
-|                                               |
-|   Low Battery: 1  |  Offline: 1  |  Total: 4 |
-+-----------------------------------------------+
+┌─────────────────────────────────────────┐
+│ ✓ Security Devices              All OK  │
+├─────────────────────────────────────────┤
+│  Online: 5  │  Offline: 1  │  Low Battery: 1│
+├─────────────────────────────────────────┤
+│  Today    ████████████████████░░  98.2% │
+│  7 days   ███████████████████░░░  95.1% │
+├─────────────────────────────────────────┤
+│  ▾ Entities (6)                         │
+│    Entity          State       Bat.     │
+│    ─────────────────────────────────    │
+│    ● Camera 1      Online      100%    │
+│    ● Camera 2      Online       85%    │
+│    ▲ Door Lock     Low Battery  18%    │
+│    ✖ Sensor 3      Offline 12m         │
+│    ● Motion 1      Online              │
+│    ● Smart Plug    Online              │
+└─────────────────────────────────────────┘
 ```
 
 ---
@@ -402,4 +428,4 @@ python -m pytest tests/ -v
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the GNU General Public License v3.0. See the [LICENSE](LICENSE) file for details.
