@@ -4,6 +4,7 @@
   "codeowners": ["@italo-lombardi"],
   "config_flow": true,
   "dependencies": [],
+  "after_dependencies": ["lovelace"],
   "documentation": "https://github.com/italo-lombardi/Home-Assistant-EntityAvailability",
   "integration_type": "service",
   "iot_class": "calculated",
