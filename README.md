@@ -1,9 +1,10 @@
 # Entity Availability for Home Assistant
 
-[![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
-[![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.1%2B-blue.svg)](https://www.home-assistant.io/)
-[![GitHub Release](https://img.shields.io/github/v/release/italo-lombardi/Home-Assistant-EntityAvailability)](https://github.com/italo-lombardi/Home-Assistant-EntityAvailability/releases)
 [![GitHub Downloads](https://img.shields.io/github/downloads/italo-lombardi/Home-Assistant-EntityAvailability/total)](https://github.com/italo-lombardi/Home-Assistant-EntityAvailability/releases)
+[![GitHub Release](https://img.shields.io/github/v/release/italo-lombardi/Home-Assistant-EntityAvailability)](https://github.com/italo-lombardi/Home-Assistant-EntityAvailability/releases)
+[![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
+[![HACS Installs](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fanalytics.home-assistant.io%2Fcustom_integrations.json&query=%24.entity_availability.total&label=installs&color=41BDF5)](https://github.com/italo-lombardi/Home-Assistant-EntityAvailability)
+[![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.1%2B-blue.svg)](https://www.home-assistant.io/)
 [![License](https://img.shields.io/github/license/italo-lombardi/Home-Assistant-EntityAvailability)](LICENSE)
 
 Monitor entity availability in Home Assistant. Track offline entities, availability history, and degraded states with a custom dashboard card.
