@@ -191,16 +191,12 @@ class EntityAvailabilityConfigFlow(ConfigFlow, domain=DOMAIN):
         schema_dict: dict[Any, Any] = {}
         for entity_id in self._data[CONF_ENTITIES]:
             detected = self._detect_battery_entity(entity_id)
-            if detected:
-                schema_dict[vol.Optional(entity_id, default=detected)] = (
-                    selector.EntitySelector(
-                        selector.EntitySelectorConfig(domain="sensor")
-                    )
+            schema_dict[
+                vol.Optional(
+                    entity_id,
+                    description={"suggested_value": detected} if detected else None,
                 )
-            else:
-                schema_dict[vol.Optional(entity_id)] = selector.EntitySelector(
-                    selector.EntitySelectorConfig(domain="sensor")
-                )
+            ] = selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor"))
 
         return self.async_show_form(
             step_id="battery_mapping",
@@ -352,16 +348,12 @@ class EntityAvailabilityOptionsFlow(OptionsFlow):
             default = existing_map.get(entity_id, "")
             if not default:
                 default = self._detect_battery_entity(entity_id)
-            if default:
-                schema_dict[vol.Optional(entity_id, default=default)] = (
-                    selector.EntitySelector(
-                        selector.EntitySelectorConfig(domain="sensor")
-                    )
+            schema_dict[
+                vol.Optional(
+                    entity_id,
+                    description={"suggested_value": default} if default else None,
                 )
-            else:
-                schema_dict[vol.Optional(entity_id)] = selector.EntitySelector(
-                    selector.EntitySelectorConfig(domain="sensor")
-                )
+            ] = selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor"))
 
         return self.async_show_form(
             step_id="battery_mapping",
