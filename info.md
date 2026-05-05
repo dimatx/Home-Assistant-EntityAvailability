@@ -16,6 +16,7 @@ Monitor entity availability across your Home Assistant setup. Track offline enti
 - Maintenance/suppression mode — suppress individual entities or entire groups
 - Any Offline binary sensor (Problem class) — triggers automations when entities go offline
 - Custom Lovelace card — dashboard-style display with status icon, stats, availability bars, entity list, and visual editor
+- Configurable entity sort order in card — by status, name, or battery level (ascending/descending)
 - Customizable availability bar colors and thresholds
 - Optional suppress/unsuppress action buttons in card
 - Survives HA restarts — history persisted via HA Store, no recorder dependency

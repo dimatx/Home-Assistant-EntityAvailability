@@ -431,6 +431,7 @@ class EntityAvailabilityCard extends LitElement {
       entities_expanded: false,
       show_actions: false,
       compact: false,
+      sort_by: "status",
       ...config,
     };
     this._entitiesExpanded = this._config.entities_expanded;
@@ -643,11 +644,28 @@ class EntityAvailabilityCard extends LitElement {
     });
 
     items.sort((a, b) => {
-      if (a.isOffline && !b.isOffline) return -1;
-      if (!a.isOffline && b.isOffline) return 1;
-      if (a.dotColor === "yellow" && b.dotColor === "green") return -1;
-      if (a.dotColor === "green" && b.dotColor === "yellow") return 1;
-      return a.name.localeCompare(b.name);
+      const sortBy = this._config.sort_by || "status";
+      if (sortBy === "name_asc") {
+        return a.name.localeCompare(b.name);
+      } else if (sortBy === "name_desc") {
+        return b.name.localeCompare(a.name);
+      } else if (sortBy === "battery_asc") {
+        const aBat = a.battery ?? 101;
+        const bBat = b.battery ?? 101;
+        if (aBat !== bBat) return aBat - bBat;
+        return a.name.localeCompare(b.name);
+      } else if (sortBy === "battery_desc") {
+        const aBat = a.battery ?? -1;
+        const bBat = b.battery ?? -1;
+        if (aBat !== bBat) return bBat - aBat;
+        return a.name.localeCompare(b.name);
+      } else {
+        if (a.isOffline && !b.isOffline) return -1;
+        if (!a.isOffline && b.isOffline) return 1;
+        if (a.dotColor === "yellow" && b.dotColor === "green") return -1;
+        if (a.dotColor === "green" && b.dotColor === "yellow") return 1;
+        return a.name.localeCompare(b.name);
+      }
     });
 
     return items;
@@ -893,6 +911,19 @@ class EntityAvailabilityCardEditor extends LitElement {
             />
             Compact Mode
           </label>
+        </div>
+        <div class="editor-row">
+          <label>Sort Entities By</label>
+          <select
+            .value=${this._config.sort_by || "status"}
+            @change=${(e) => this._updateConfig("sort_by", e.target.value)}
+          >
+            <option value="status"       .selected=${(this._config.sort_by || "status") === "status"}>Status (default)</option>
+            <option value="name_asc"     .selected=${this._config.sort_by === "name_asc"}>Name A → Z</option>
+            <option value="name_desc"    .selected=${this._config.sort_by === "name_desc"}>Name Z → A</option>
+            <option value="battery_asc"  .selected=${this._config.sort_by === "battery_asc"}>Battery ↑ (weakest first)</option>
+            <option value="battery_desc" .selected=${this._config.sort_by === "battery_desc"}>Battery ↓ (strongest first)</option>
+          </select>
         </div>
         <div class="threshold-section">
           <label>Availability Bar Colors & Thresholds</label>
