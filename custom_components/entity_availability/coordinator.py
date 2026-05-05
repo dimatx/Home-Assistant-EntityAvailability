@@ -187,7 +187,7 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
         def _debounced_refresh(_now: Any) -> None:
             """Trigger a coordinator refresh after debounce."""
             self._debounce_cancel = None
-            self.async_request_refresh()
+            self.hass.async_create_task(self.async_request_refresh())
 
         # Schedule a debounced refresh
         self._debounce_cancel = async_call_later(
