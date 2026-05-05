@@ -60,6 +60,7 @@ def sort_entities(items: list[EntityItem], sort_by: str = "status") -> list[Enti
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _online(name: str, battery: Optional[int] = None) -> EntityItem:
     dot = "yellow" if battery is not None and battery < 20 else "green"
     status = "Low Battery" if dot == "yellow" else "Online"
@@ -87,6 +88,7 @@ def _offline(name: str, battery: Optional[int] = None) -> EntityItem:
 # ---------------------------------------------------------------------------
 # status (default)
 # ---------------------------------------------------------------------------
+
 
 class TestSortByStatus:
     def test_offline_before_online(self):
@@ -117,7 +119,11 @@ class TestSortByStatus:
         assert [r.name for r in result] == ["Alpha", "Beta", "Charlie"]
 
     def test_alphabetical_within_low_battery(self):
-        items = [_online("Charlie", battery=5), _online("Alpha", battery=5), _online("Beta", battery=5)]
+        items = [
+            _online("Charlie", battery=5),
+            _online("Alpha", battery=5),
+            _online("Beta", battery=5),
+        ]
         result = sort_entities(items, "status")
         assert [r.name for r in result] == ["Alpha", "Beta", "Charlie"]
 
@@ -136,6 +142,7 @@ class TestSortByStatus:
 # ---------------------------------------------------------------------------
 # name_asc
 # ---------------------------------------------------------------------------
+
 
 class TestSortByNameAsc:
     def test_alphabetical_order(self):
@@ -168,6 +175,7 @@ class TestSortByNameAsc:
 # name_desc
 # ---------------------------------------------------------------------------
 
+
 class TestSortByNameDesc:
     def test_reverse_alphabetical_order(self):
         items = [_online("Alpha"), _offline("Charlie"), _online("Beta")]
@@ -189,14 +197,23 @@ class TestSortByNameDesc:
 # battery_asc (weakest first)
 # ---------------------------------------------------------------------------
 
+
 class TestSortByBatteryAsc:
     def test_lowest_battery_first(self):
-        items = [_online("Alpha", battery=80), _online("Beta", battery=10), _online("Charlie", battery=50)]
+        items = [
+            _online("Alpha", battery=80),
+            _online("Beta", battery=10),
+            _online("Charlie", battery=50),
+        ]
         result = sort_entities(items, "battery_asc")
         assert [r.battery for r in result] == [10, 50, 80]
 
     def test_no_battery_sorts_last(self):
-        items = [_online("Alpha"), _online("Beta", battery=50), _online("Charlie", battery=10)]
+        items = [
+            _online("Alpha"),
+            _online("Beta", battery=50),
+            _online("Charlie", battery=10),
+        ]
         result = sort_entities(items, "battery_asc")
         assert result[-1].name == "Alpha"
         assert result[-1].battery is None
@@ -209,7 +226,11 @@ class TestSortByBatteryAsc:
         assert result[2].name == "Zara"
 
     def test_same_battery_alphabetical_tiebreak(self):
-        items = [_online("Charlie", battery=20), _online("Alpha", battery=20), _online("Beta", battery=20)]
+        items = [
+            _online("Charlie", battery=20),
+            _online("Alpha", battery=20),
+            _online("Beta", battery=20),
+        ]
         result = sort_entities(items, "battery_asc")
         assert [r.name for r in result] == ["Alpha", "Beta", "Charlie"]
 
@@ -233,14 +254,23 @@ class TestSortByBatteryAsc:
 # battery_desc (strongest first)
 # ---------------------------------------------------------------------------
 
+
 class TestSortByBatteryDesc:
     def test_highest_battery_first(self):
-        items = [_online("Alpha", battery=10), _online("Beta", battery=80), _online("Charlie", battery=50)]
+        items = [
+            _online("Alpha", battery=10),
+            _online("Beta", battery=80),
+            _online("Charlie", battery=50),
+        ]
         result = sort_entities(items, "battery_desc")
         assert [r.battery for r in result] == [80, 50, 10]
 
     def test_no_battery_sorts_last(self):
-        items = [_online("Alpha"), _online("Beta", battery=50), _online("Charlie", battery=10)]
+        items = [
+            _online("Alpha"),
+            _online("Beta", battery=50),
+            _online("Charlie", battery=10),
+        ]
         result = sort_entities(items, "battery_desc")
         assert result[-1].name == "Alpha"
         assert result[-1].battery is None
@@ -253,7 +283,11 @@ class TestSortByBatteryDesc:
         assert result[2].name == "Zara"
 
     def test_same_battery_alphabetical_tiebreak(self):
-        items = [_online("Charlie", battery=80), _online("Alpha", battery=80), _online("Beta", battery=80)]
+        items = [
+            _online("Charlie", battery=80),
+            _online("Alpha", battery=80),
+            _online("Beta", battery=80),
+        ]
         result = sort_entities(items, "battery_desc")
         assert [r.name for r in result] == ["Alpha", "Beta", "Charlie"]
 
@@ -281,6 +315,7 @@ class TestSortByBatteryDesc:
 # ---------------------------------------------------------------------------
 # unknown / fallback sort_by value
 # ---------------------------------------------------------------------------
+
 
 class TestSortByFallback:
     def test_unknown_value_uses_status(self):
