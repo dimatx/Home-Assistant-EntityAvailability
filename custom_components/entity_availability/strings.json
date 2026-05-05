@@ -29,6 +29,9 @@
         "data": {
           "battery_threshold": "Low battery threshold (%, 0 = disabled)",
           "availability_windows": "Availability tracking windows"
+        },
+        "data_description": {
+          "battery_threshold": "Flag entities whose battery falls below this percentage. The 'low' state is also automatically detected. Volt-based entities are not supported. Use entities that report battery as a percentage or support the 'low' state."
         }
       },
       "battery_mapping": {
@@ -56,6 +59,9 @@
           "staleness_threshold": "Staleness threshold (minutes, 0 = disabled)",
           "battery_threshold": "Low battery threshold (%, 0 = disabled)",
           "availability_windows": "Availability tracking windows"
+        },
+        "data_description": {
+          "battery_threshold": "Flag entities whose battery falls below this percentage. The 'low' state is also automatically detected. Volt-based entities are not supported. Use entities that report battery as a percentage or support the 'low' state."
         }
       },
       "battery_mapping": {
