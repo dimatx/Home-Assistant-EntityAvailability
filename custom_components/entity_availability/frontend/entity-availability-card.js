@@ -500,6 +500,7 @@ class EntityAvailabilityCard extends LitElement {
       compact: false,
       sort_by: "status",
       entity_detail: "off",
+      entity_filter: "all",
       ...config,
     };
     // backwards compat: show_entity_tooltips: true → entity_detail: "tooltip"
@@ -643,15 +644,29 @@ class EntityAvailabilityCard extends LitElement {
   _renderEntityList(entities, batteryLevels, suppressedUntil, staleEntities, offlineSince, total) {
     if (entities.length === 0 && total === 0) return nothing;
 
-    const items = this._buildEntityItems(entities, batteryLevels, staleEntities, offlineSince, suppressedUntil);
+    const allItems = this._buildEntityItems(entities, batteryLevels, staleEntities, offlineSince, suppressedUntil);
+    const filter = this._config.entity_filter || "all";
+    const items = filter === "offline"
+      ? allItems.filter((i) => i.isOffline || i.isStale || i.dotColor === "yellow")
+      : filter === "online"
+      ? allItems.filter((i) => !i.isOffline && !i.isStale && i.dotColor !== "yellow")
+      : allItems;
+
     const expanded = this._entitiesExpanded;
-    const hasBattery = items.some((i) => i.battery !== null);
+    const hasBattery = allItems.some((i) => i.battery !== null);
+
+    const sectionTitle = filter === "offline" ? "Offline Entities"
+      : filter === "online" ? "Healthy Entities"
+      : "Entities";
+    const countLabel = filter !== "all"
+      ? `${items.length}/${allItems.length}`
+      : `${items.length}`;
 
     return html`
       <div class="divider"></div>
       <div class="entity-section-header" @click=${this._toggleEntities}>
         <span class="entity-section-title">
-          Entities (${items.length})
+          ${sectionTitle} (${countLabel})
         </span>
         <ha-icon
           class="chevron ${expanded ? "expanded" : ""}"
@@ -1074,6 +1089,18 @@ class EntityAvailabilityCardEditor extends LitElement {
             />
             Show Entity List
           </label>
+        </div>
+        <div class="editor-row">
+          <label>Filter Entities (requires Show Entity List)</label>
+          <select
+            .value=${this._config.entity_filter || "all"}
+            @change=${(e) => this._updateConfig("entity_filter", e.target.value)}
+            ?disabled=${this._config.show_entities === false}
+          >
+            <option value="all">All entities</option>
+            <option value="offline">Problems only (offline, stale, low battery)</option>
+            <option value="online">Healthy only (online)</option>
+          </select>
         </div>
         <div class="editor-row checkbox">
           <label>

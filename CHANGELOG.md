@@ -10,6 +10,10 @@ All notable changes to this project will be documented in this file.
 - Card: `entity_detail` option (`"off"` / `"tooltip"` / `"inline"`) replaces `show_entity_tooltips` boolean
   - `"tooltip"`: hover tooltip showing Entity ID, Area, HA State + duration, Condition, Battery, Suppressed Until
   - `"inline"`: same detail always visible as a block under each entity row; when combined with `compact: true`, shows only HA State + duration (ideal for "last seen" at a glance)
+- Card: `entity_filter` option (`"all"` / `"offline"` / `"online"`) — filter entity list by health status
+  - `"offline"`: shows only problem entities (offline, stale, low battery)
+  - `"online"`: shows only healthy entities
+  - Section title and count update to reflect filter: "Offline Entities (2/6)" / "Healthy Entities (4/6)"
 - Card: stale entity detection — entities that haven't changed state beyond the staleness threshold shown with a grey dot and "Stale" status
 - Card: suppressed entities now display "Suppressed" as their condition in the entity list (green dot) instead of showing their underlying state
 - Card: timestamps beautified — durations show as "X minutes ago / X hours ago / X days ago", suppression expiry shows as "today at HH:MM" or "May 10" or "May 10, 2027"

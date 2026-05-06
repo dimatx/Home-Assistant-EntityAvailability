@@ -350,6 +350,7 @@ entities_expanded: false
 show_actions: false
 compact: false
 entity_detail: "off"
+entity_filter: "all"
 sort_by: status
 availability_thresholds:
   high: 99
@@ -369,6 +370,7 @@ availability_colors:
 | `entities_expanded` | `false` | Start entity list expanded |
 | `show_actions` | `false` | Show Suppress/Unsuppress buttons |
 | `entity_detail` | `"off"` | Entity detail mode: `"off"`, `"tooltip"` (hover), `"inline"` (always visible). When `compact: true` + `"inline"`, shows only HA State + last-changed duration |
+| `entity_filter` | `"all"` | Filter entity list: `"all"`, `"offline"` (problems only: offline/stale/low battery), `"online"` (healthy only). Section title and count update to reflect filter (e.g., "Offline Entities (2/6)") |
 | `compact` | `false` | Reduced padding mode |
 | `sort_by` | `status` | Entity list sort order: `status`, `name_asc`, `name_desc`, `battery_asc`, `battery_desc` |
 | `availability_thresholds` | `{high: 99, mid: 95}` | % thresholds for bar colors |
