@@ -308,6 +308,19 @@ const cardStyles = css`
     padding: 5px 0;
     gap: 10px;
     position: relative;
+    flex-wrap: wrap;
+  }
+
+  .entity-detail-inline {
+    width: 100%;
+    padding: 2px 0 6px 20px;
+    font-size: 12px;
+    border-bottom: 1px solid var(--eac-divider);
+    margin-bottom: 2px;
+  }
+
+  .entity-detail-inline .entity-tooltip-row {
+    padding: 1px 0;
   }
 
   .entity-tooltip {
@@ -486,9 +499,13 @@ class EntityAvailabilityCard extends LitElement {
       show_actions: false,
       compact: false,
       sort_by: "status",
-      show_entity_tooltips: false,
+      entity_detail: "off",
       ...config,
     };
+    // backwards compat: show_entity_tooltips: true → entity_detail: "tooltip"
+    if (!config.entity_detail && config.show_entity_tooltips) {
+      this._config.entity_detail = "tooltip";
+    }
     this._entitiesExpanded = this._config.entities_expanded;
   }
 
@@ -657,7 +674,12 @@ class EntityAvailabilityCard extends LitElement {
               ${hasBattery
                 ? html`<span class="entity-battery">${item.battery !== null ? `${item.battery}%` : ""}</span>`
                 : nothing}
-              ${this._config.show_entity_tooltips ? this._renderTooltip(item, suppressedUntil) : nothing}
+              ${this._config.entity_detail === "tooltip"
+                ? this._renderTooltip(item, suppressedUntil)
+                : nothing}
+              ${this._config.entity_detail === "inline"
+                ? this._renderDetailInline(item, suppressedUntil)
+                : nothing}
             </div>
           `
         )}
@@ -756,7 +778,7 @@ class EntityAvailabilityCard extends LitElement {
     return items;
   }
 
-  _renderTooltip(item, suppressedUntilMap) {
+  _buildDetailRows(item, suppressedUntilMap) {
     const entityState = this.hass.states[item.entityId];
     const lastChanged = entityState?.last_changed
       ? this._computeDuration(item.entityId)
@@ -770,7 +792,7 @@ class EntityAvailabilityCard extends LitElement {
       ? this._formatFutureDate(suppressedUntilIso)
       : null;
 
-    const rows = [
+    return [
       { label: "Entity ID", value: item.entityId },
       areaName ? { label: "Area", value: areaName } : null,
       { label: "HA State", value: lastChanged ? `${entityState.state} · ${lastChanged}` : (entityState?.state || "unknown") },
@@ -778,9 +800,39 @@ class EntityAvailabilityCard extends LitElement {
       item.battery !== null ? { label: "Battery", value: `${item.battery}%` } : null,
       suppressedUntil ? { label: "Suppressed", value: `until ${suppressedUntil}` } : null,
     ].filter(Boolean);
+  }
 
+  _renderTooltip(item, suppressedUntilMap) {
+    const rows = this._buildDetailRows(item, suppressedUntilMap);
     return html`
       <div class="entity-tooltip">
+        ${rows.map((r) => html`
+          <div class="entity-tooltip-row">
+            <span class="entity-tooltip-label">${r.label}</span>
+            <span class="entity-tooltip-value">${r.value}</span>
+          </div>
+        `)}
+      </div>
+    `;
+  }
+
+  _renderDetailInline(item, suppressedUntilMap) {
+    const compact = this._config.compact === true;
+    let rows;
+    if (compact) {
+      const entityState = this.hass.states[item.entityId];
+      const lastChanged = entityState?.last_changed
+        ? this._computeDuration(item.entityId)
+        : null;
+      const haStateValue = lastChanged
+        ? `${entityState.state} · ${lastChanged}`
+        : (entityState?.state || "unknown");
+      rows = [{ label: "HA State", value: haStateValue }];
+    } else {
+      rows = this._buildDetailRows(item, suppressedUntilMap);
+    }
+    return html`
+      <div class="entity-detail-inline">
         ${rows.map((r) => html`
           <div class="entity-tooltip-row">
             <span class="entity-tooltip-label">${r.label}</span>
@@ -921,7 +973,8 @@ class EntityAvailabilityCardEditor extends LitElement {
         font-weight: 500;
         margin-bottom: 4px;
       }
-      .editor-row input[type="text"] {
+      .editor-row input[type="text"],
+      .editor-row select {
         width: 100%;
         padding: 8px;
         border: 1px solid var(--divider-color, #ccc);
@@ -1052,15 +1105,16 @@ class EntityAvailabilityCardEditor extends LitElement {
             Compact Mode
           </label>
         </div>
-        <div class="editor-row checkbox">
-          <label>
-            <input
-              type="checkbox"
-              .checked=${this._config.show_entity_tooltips === true}
-              @change=${(e) => this._updateConfig("show_entity_tooltips", e.target.checked)}
-            />
-            Show Entity Tooltips on Hover
-          </label>
+        <div class="editor-row">
+          <label>Entity Detail</label>
+          <select
+            .value=${this._config.entity_detail || "off"}
+            @change=${(e) => this._updateConfig("entity_detail", e.target.value)}
+          >
+            <option value="off">Off</option>
+            <option value="tooltip">Tooltip on hover</option>
+            <option value="inline">Always visible (inline)</option>
+          </select>
         </div>
         <div class="editor-row">
           <label>Sort Entities By</label>

@@ -349,6 +349,7 @@ show_entities: true
 entities_expanded: false
 show_actions: false
 compact: false
+entity_detail: "off"
 sort_by: status
 availability_thresholds:
   high: 99
@@ -367,11 +368,13 @@ availability_colors:
 | `show_entities` | `true` | Show expandable entity list |
 | `entities_expanded` | `false` | Start entity list expanded |
 | `show_actions` | `false` | Show Suppress/Unsuppress buttons |
-| `show_entity_tooltips` | `false` | Show hover tooltip with entity details (ID, area, HA state, condition, battery, suppression) |
+| `entity_detail` | `"off"` | Entity detail mode: `"off"`, `"tooltip"` (hover), `"inline"` (always visible). When `compact: true` + `"inline"`, shows only HA State + last-changed duration |
 | `compact` | `false` | Reduced padding mode |
 | `sort_by` | `status` | Entity list sort order: `status`, `name_asc`, `name_desc`, `battery_asc`, `battery_desc` |
 | `availability_thresholds` | `{high: 99, mid: 95}` | % thresholds for bar colors |
 | `availability_colors` | `{high, mid, low}` | Custom hex colors for bars |
+
+> **Migration:** `show_entity_tooltips: true` from previous versions is automatically treated as `entity_detail: "tooltip"` — no manual update needed.
 
 The `group` field should be the group slug (e.g., `security_devices`). The card uses the prefix `entity_availability_` + group slug to locate all related entities automatically.
 
