@@ -1,38 +1,9 @@
 /**
- * Entity Availability Card v0.1.0
+ * Entity Availability Card v0.2.0
  * Custom Lovelace card for the Home Assistant Entity Availability integration.
  */
-const LitElement = Object.getPrototypeOf(
-  customElements.get("ha-panel-lovelace")
-);
-const { html, nothing } = LitElement.prototype;
 
-// Provide css tagged template - works whether or not HA exposes it on prototype
-const css = LitElement.prototype.css || (() => {
-  class CSSResult {
-    constructor(cssText) {
-      this.cssText = cssText;
-      this._styleSheet = null;
-    }
-    get styleSheet() {
-      if (this._styleSheet === null && window.CSSStyleSheet) {
-        try {
-          this._styleSheet = new CSSStyleSheet();
-          this._styleSheet.replaceSync(this.cssText);
-        } catch (e) {
-          this._styleSheet = null;
-        }
-      }
-      return this._styleSheet;
-    }
-    toString() { return this.cssText; }
-  }
-  return (strings, ...values) => new CSSResult(
-    strings.reduce((acc, str, i) => acc + str + (values[i] != null ? String(values[i]) : ""), "")
-  );
-})();
-
-const CARD_VERSION = "0.1.0";
+const CARD_VERSION = "0.2.0";
 
 console.info(
   `%c ENTITY-AVAILABILITY-CARD %c v${CARD_VERSION} %c — github.com/italo-lombardi `,
@@ -40,6 +11,46 @@ console.info(
   "color: #4caf50; background: #e8f5e9; font-weight: bold; padding: 2px 6px;",
   "color: #9e9e9e; background: #e8f5e9; padding: 2px 6px; border-radius: 0 3px 3px 0;"
 );
+
+window.customCards = window.customCards || [];
+window.customCards.push({
+  type: "entity-availability-card",
+  name: "Entity Availability Card",
+  description: "Dashboard-style entity health monitoring with availability bars and entity list.",
+  preview: true,
+  documentationURL: "https://github.com/italo-lombardi/Home-Assistant-EntityAvailability",
+});
+
+customElements.whenDefined("ha-panel-lovelace").then(() => {
+  if (customElements.get("entity-availability-card")) return;
+  const haPanel = customElements.get("ha-panel-lovelace");
+  if (!haPanel) return;
+  const LitElement = Object.getPrototypeOf(haPanel);
+  const { html, nothing } = LitElement.prototype;
+
+  const css = LitElement.prototype.css || (() => {
+    class CSSResult {
+      constructor(cssText) {
+        this.cssText = cssText;
+        this._styleSheet = null;
+      }
+      get styleSheet() {
+        if (this._styleSheet === null && window.CSSStyleSheet) {
+          try {
+            this._styleSheet = new CSSStyleSheet();
+            this._styleSheet.replaceSync(this.cssText);
+          } catch (e) {
+            this._styleSheet = null;
+          }
+        }
+        return this._styleSheet;
+      }
+      toString() { return this.cssText; }
+    }
+    return (strings, ...values) => new CSSResult(
+      strings.reduce((acc, str, i) => acc + str + (values[i] != null ? String(values[i]) : ""), "")
+    );
+  })();
 
 const AVAILABILITY_WINDOWS = [
   { key: "today", label: "Today" },
@@ -72,7 +83,7 @@ const cardStyles = css`
   }
 
   ha-card {
-    overflow: hidden;
+    overflow: visible;
   }
 
   .card-header {
@@ -233,7 +244,7 @@ const cardStyles = css`
 
   .entity-list {
     padding: 0 16px 12px;
-    overflow: hidden;
+    overflow: visible;
     transition: max-height 0.3s ease, opacity 0.3s ease;
   }
 
@@ -241,6 +252,7 @@ const cardStyles = css`
     max-height: 0;
     opacity: 0;
     padding: 0 16px;
+    overflow: hidden;
   }
 
   .entity-list.expanded {
@@ -295,6 +307,47 @@ const cardStyles = css`
     align-items: center;
     padding: 5px 0;
     gap: 10px;
+    position: relative;
+  }
+
+  .entity-tooltip {
+    display: none;
+    position: absolute;
+    left: 0;
+    top: calc(100% + 4px);
+    z-index: 10;
+    background: var(--card-background-color, #fff);
+    border: 1px solid var(--divider-color, rgba(0,0,0,0.12));
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    padding: 8px 10px;
+    font-size: 12px;
+    color: var(--primary-text-color, #212121);
+    white-space: nowrap;
+    pointer-events: none;
+    min-width: 200px;
+  }
+
+  .entity-item:hover .entity-tooltip {
+    display: block;
+  }
+
+  .entity-tooltip-row {
+    display: flex;
+    gap: 6px;
+    padding: 1px 0;
+  }
+
+  .entity-tooltip-label {
+    color: var(--secondary-text-color, #727272);
+    min-width: 80px;
+    flex-shrink: 0;
+  }
+
+  .entity-tooltip-value {
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .entity-dot {
@@ -307,6 +360,7 @@ const cardStyles = css`
   .entity-dot.green { background-color: var(--eac-green); }
   .entity-dot.red { background-color: var(--eac-red); }
   .entity-dot.yellow { background-color: var(--eac-yellow); }
+  .entity-dot.grey { background-color: var(--eac-bar-bg); }
 
   .entity-name {
     font-size: 13px;
@@ -432,6 +486,7 @@ class EntityAvailabilityCard extends LitElement {
       show_actions: false,
       compact: false,
       sort_by: "status",
+      show_entity_tooltips: false,
       ...config,
     };
     this._entitiesExpanded = this._config.entities_expanded;
@@ -482,6 +537,9 @@ class EntityAvailabilityCard extends LitElement {
     const suppressed = attrs.suppressed || 0;
     const entities = attrs.entities || [];
     const batteryLevels = attrs.battery_levels || {};
+    const suppressedUntil = attrs.suppressed_until || {};
+    const staleEntities = attrs.stale_entities || [];
+    const offlineSince = attrs.offline_since || {};
 
     const statusColor = offline > 0 ? "red" : lowBattery > 0 ? "yellow" : "green";
     const title = this._config.title || this._formatGroupName(this._config.group);
@@ -500,7 +558,7 @@ class EntityAvailabilityCard extends LitElement {
         ${this._renderStats(online, offline, lowBattery, suppressed)}
         ${suppressed > 0 ? html`<div class="suppressed-banner">${suppressed} entity${suppressed > 1 ? "ies" : ""} suppressed</div>` : nothing}
         ${this._config.show_availability ? this._renderAvailability(prefix) : nothing}
-        ${this._config.show_entities ? this._renderEntityList(entities, batteryLevels, total) : nothing}
+        ${this._config.show_entities ? this._renderEntityList(entities, batteryLevels, suppressedUntil, staleEntities, offlineSince, total) : nothing}
         ${this._config.show_actions ? this._renderActions(prefix) : nothing}
       </ha-card>
     `;
@@ -565,10 +623,10 @@ class EntityAvailabilityCard extends LitElement {
     `;
   }
 
-  _renderEntityList(entities, batteryLevels, total) {
+  _renderEntityList(entities, batteryLevels, suppressedUntil, staleEntities, offlineSince, total) {
     if (entities.length === 0 && total === 0) return nothing;
 
-    const items = this._buildEntityItems(entities, batteryLevels);
+    const items = this._buildEntityItems(entities, batteryLevels, staleEntities, offlineSince, suppressedUntil);
     const expanded = this._entitiesExpanded;
     const hasBattery = items.some((i) => i.battery !== null);
 
@@ -599,6 +657,7 @@ class EntityAvailabilityCard extends LitElement {
               ${hasBattery
                 ? html`<span class="entity-battery">${item.battery !== null ? `${item.battery}%` : ""}</span>`
                 : nothing}
+              ${this._config.show_entity_tooltips ? this._renderTooltip(item, suppressedUntil) : nothing}
             </div>
           `
         )}
@@ -620,27 +679,51 @@ class EntityAvailabilityCard extends LitElement {
     `;
   }
 
-  _buildEntityItems(entities, batteryLevels) {
+  _buildEntityItems(entities, batteryLevels, staleEntities, offlineSince, suppressedUntil) {
     const items = entities.map((entityId) => {
       const state = this.hass.states[entityId];
       const friendlyName = state?.attributes?.friendly_name || entityId.split(".").pop();
       const offlineEntities = this._getOfflineEntityIds();
       const isOffline = offlineEntities.includes(entityId);
+      const isStale = staleEntities.includes(entityId);
+      const isSuppressed = entityId in suppressedUntil;
       const battery = batteryLevels[entityId] ?? null;
       const batteryThreshold = 20;
 
       let dotColor = "green";
       let status = "Online";
 
-      if (isOffline) {
+      if (isSuppressed) {
+        dotColor = "green";
+        status = "Suppressed";
+      } else if (isOffline) {
         dotColor = "red";
-        status = this._computeDuration(entityId) || "Offline";
+        const since = offlineSince[entityId];
+        if (since) {
+          const diff = Date.now() - new Date(since).getTime();
+          const minutes = Math.floor(diff / 60000);
+          if (minutes < 1) status = "just now";
+          else if (minutes < 60) status = `${minutes} minute${minutes === 1 ? "" : "s"}`;
+          else {
+            const hours = Math.floor(minutes / 60);
+            if (hours < 24) status = `${hours} hour${hours === 1 ? "" : "s"}`;
+            else {
+              const days = Math.floor(hours / 24);
+              status = `${days} day${days === 1 ? "" : "s"}`;
+            }
+          }
+        } else {
+          status = "Offline";
+        }
+      } else if (isStale) {
+        dotColor = "grey";
+        status = "Stale";
       } else if (battery !== null && battery < batteryThreshold) {
         dotColor = "yellow";
         status = "Low Battery";
       }
 
-      return { entityId, name: friendlyName, dotColor, status, battery, isOffline };
+      return { entityId, name: friendlyName, dotColor, status, battery, isOffline, isStale, isSuppressed };
     });
 
     items.sort((a, b) => {
@@ -664,11 +747,48 @@ class EntityAvailabilityCard extends LitElement {
         if (!a.isOffline && b.isOffline) return 1;
         if (a.dotColor === "yellow" && b.dotColor === "green") return -1;
         if (a.dotColor === "green" && b.dotColor === "yellow") return 1;
+        if (a.dotColor === "grey" && b.dotColor === "green") return -1;
+        if (a.dotColor === "green" && b.dotColor === "grey") return 1;
         return a.name.localeCompare(b.name);
       }
     });
 
     return items;
+  }
+
+  _renderTooltip(item, suppressedUntilMap) {
+    const entityState = this.hass.states[item.entityId];
+    const lastChanged = entityState?.last_changed
+      ? this._computeDuration(item.entityId)
+      : null;
+
+    const areaId = this.hass.entities?.[item.entityId]?.area_id;
+    const areaName = areaId ? (this.hass.areas?.[areaId]?.name || null) : null;
+
+    const suppressedUntilIso = suppressedUntilMap[item.entityId];
+    const suppressedUntil = suppressedUntilIso
+      ? this._formatFutureDate(suppressedUntilIso)
+      : null;
+
+    const rows = [
+      { label: "Entity ID", value: item.entityId },
+      areaName ? { label: "Area", value: areaName } : null,
+      { label: "HA State", value: lastChanged ? `${entityState.state} · ${lastChanged}` : (entityState?.state || "unknown") },
+      { label: "Condition", value: suppressedUntil ? "Suppressed" : item.isOffline ? `Offline for ${item.status}` : item.status },
+      item.battery !== null ? { label: "Battery", value: `${item.battery}%` } : null,
+      suppressedUntil ? { label: "Suppressed", value: `until ${suppressedUntil}` } : null,
+    ].filter(Boolean);
+
+    return html`
+      <div class="entity-tooltip">
+        ${rows.map((r) => html`
+          <div class="entity-tooltip-row">
+            <span class="entity-tooltip-label">${r.label}</span>
+            <span class="entity-tooltip-value">${r.value}</span>
+          </div>
+        `)}
+      </div>
+    `;
   }
 
   _getOfflineEntityIds() {
@@ -705,11 +825,31 @@ class EntityAvailabilityCard extends LitElement {
     const minutes = Math.floor(diff / 60000);
 
     if (minutes < 1) return "just now";
-    if (minutes < 60) return `${minutes}m`;
+    if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
     const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours}h`;
+    if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
     const days = Math.floor(hours / 24);
-    return `${days}d`;
+    if (days < 7) return `${days} day${days === 1 ? "" : "s"} ago`;
+    const weeks = Math.floor(days / 7);
+    return `${weeks} week${weeks === 1 ? "" : "s"} ago`;
+  }
+
+  _formatFutureDate(isoString) {
+    const date = new Date(isoString);
+    if (isNaN(date.getTime())) return isoString;
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrowStart = new Date(todayStart.getTime() + 86400000);
+
+    if (date < tomorrowStart && date >= todayStart) {
+      return `today at ${date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`;
+    }
+    const sameYear = date.getFullYear() === now.getFullYear();
+    return date.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      ...(sameYear ? {} : { year: "numeric" }),
+    });
   }
 
   _getAvailabilityColor(pct) {
@@ -912,17 +1052,27 @@ class EntityAvailabilityCardEditor extends LitElement {
             Compact Mode
           </label>
         </div>
+        <div class="editor-row checkbox">
+          <label>
+            <input
+              type="checkbox"
+              .checked=${this._config.show_entity_tooltips === true}
+              @change=${(e) => this._updateConfig("show_entity_tooltips", e.target.checked)}
+            />
+            Show Entity Tooltips on Hover
+          </label>
+        </div>
         <div class="editor-row">
           <label>Sort Entities By</label>
           <select
             .value=${this._config.sort_by || "status"}
             @change=${(e) => this._updateConfig("sort_by", e.target.value)}
           >
-            <option value="status"       .selected=${(this._config.sort_by || "status") === "status"}>Status (default)</option>
-            <option value="name_asc"     .selected=${this._config.sort_by === "name_asc"}>Name A → Z</option>
-            <option value="name_desc"    .selected=${this._config.sort_by === "name_desc"}>Name Z → A</option>
-            <option value="battery_asc"  .selected=${this._config.sort_by === "battery_asc"}>Battery ↑ (weakest first)</option>
-            <option value="battery_desc" .selected=${this._config.sort_by === "battery_desc"}>Battery ↓ (strongest first)</option>
+            <option value="status">Status (default)</option>
+            <option value="name_asc">Name A → Z</option>
+            <option value="name_desc">Name Z → A</option>
+            <option value="battery_asc">Battery ↑ (weakest first)</option>
+            <option value="battery_desc">Battery ↓ (strongest first)</option>
           </select>
         </div>
         <div class="threshold-section">
@@ -1001,11 +1151,4 @@ class EntityAvailabilityCardEditor extends LitElement {
 
 customElements.define("entity-availability-card-editor", EntityAvailabilityCardEditor);
 
-window.customCards = window.customCards || [];
-window.customCards.push({
-  type: "entity-availability-card",
-  name: "Entity Availability Card",
-  description: "Dashboard-style entity health monitoring with availability bars and entity list.",
-  preview: true,
-  documentationURL: "https://github.com/italo-lombardi/Home-Assistant-EntityAvailability",
-});
+}); // end customElements.whenDefined

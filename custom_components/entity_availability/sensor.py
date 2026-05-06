@@ -392,4 +392,17 @@ class GroupSummarySensor(
                 for eid, d in states.items()
                 if d.battery_level is not None
             },
+            "suppressed_until": {
+                eid: d.suppress_until.isoformat()
+                for eid, d in states.items()
+                if d.is_suppressed and d.suppress_until is not None
+            },
+            "stale_entities": [
+                eid for eid, d in states.items() if d.is_stale and not d.is_suppressed
+            ],
+            "offline_since": {
+                eid: d.offline_since.isoformat()
+                for eid, d in states.items()
+                if d.offline_since is not None
+            },
         }

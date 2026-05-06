@@ -18,9 +18,9 @@
           "staleness_threshold": "Seuil d'obsolescence"
         },
         "data_description": {
-          "bad_states": "États d'entité indiquant qu'une entité est hors ligne (par ex., indisponible, inconnu).",
+          "bad_states": "États d'entité indiquant qu'une entité est hors ligne (p. ex. unavailable, unknown).",
           "cooldown": "Durée (en secondes) pendant laquelle une entité doit rester dans un mauvais état avant d'être marquée hors ligne. Empêche les fausses alertes dues à de brèves déconnexions.",
-          "staleness_threshold": "Si une entité n'a pas changé d'état depuis ce nombre de minutes, la marquer comme dégradée. Cela détecte les entités qui signalent 'disponible' mais ont en réalité cessé d'envoyer des données. Mettre à 0 pour désactiver."
+          "staleness_threshold": "Si une entité n'a pas changé d'état depuis ce nombre de minutes, elle est marquée comme dégradée. Cela détecte les entités qui signalent 'disponible' mais ont en réalité cessé d'envoyer des données. Définir à 0 pour désactiver."
         }
       },
       "advanced": {
@@ -29,6 +29,10 @@
         "data": {
           "battery_threshold": "Seuil de batterie faible (%, 0 = désactivé)",
           "availability_windows": "Fenêtres de suivi de disponibilité"
+        },
+        "data_description": {
+          "battery_threshold": "Signale les entités dont la batterie passe en dessous de ce pourcentage. L'état 'low' est également détecté automatiquement. Les entités basées sur les volts ne sont pas prises en charge. Utilisez des entités qui rapportent la batterie en pourcentage ou prennent en charge l'état 'low'.",
+          "availability_windows": "Fenêtres de temps pour le suivi de l'historique de disponibilité du groupe (p. ex. aujourd'hui, 3j, 7j)."
         }
       },
       "battery_mapping": {
@@ -56,6 +60,13 @@
           "staleness_threshold": "Seuil d'obsolescence (minutes, 0 = désactivé)",
           "battery_threshold": "Seuil de batterie faible (%, 0 = désactivé)",
           "availability_windows": "Fenêtres de suivi de disponibilité"
+        },
+        "data_description": {
+          "bad_states": "États d'entité indiquant qu'une entité est hors ligne (p. ex. unavailable, unknown).",
+          "cooldown": "Durée (en secondes) pendant laquelle une entité doit rester dans un mauvais état avant d'être marquée hors ligne. Évite les fausses alarmes lors de déconnexions brèves.",
+          "staleness_threshold": "Si une entité n'a pas changé d'état depuis ce nombre de minutes, elle est marquée comme dégradée. Définir à 0 pour désactiver.",
+          "battery_threshold": "Signale les entités dont la batterie passe en dessous de ce pourcentage. L'état 'low' est également détecté automatiquement. Les entités basées sur les volts ne sont pas prises en charge.",
+          "availability_windows": "Fenêtres de temps pour le suivi de l'historique de disponibilité du groupe (p. ex. aujourd'hui, 3j, 7j)."
         }
       },
       "battery_mapping": {
@@ -66,18 +77,38 @@
   },
   "entity": {
     "sensor": {
-      "offline_count": { "name": "Nombre hors ligne" },
-      "offline_entities": { "name": "Entités hors ligne" },
-      "low_battery": { "name": "Batterie faible" },
-      "low_battery_count": { "name": "Nombre batteries faibles" },
-      "group_summary": { "name": "Résumé du groupe" },
-      "availability_today": { "name": "Disponibilité (Aujourd'hui)" },
-      "availability_3d": { "name": "Disponibilité (3 jours)" },
-      "availability_5d": { "name": "Disponibilité (5 jours)" },
-      "availability_7d": { "name": "Disponibilité (7 jours)" }
+      "offline_count": {
+        "name": "Nombre hors ligne"
+      },
+      "offline_entities": {
+        "name": "Entités hors ligne"
+      },
+      "low_battery": {
+        "name": "Batterie faible"
+      },
+      "low_battery_count": {
+        "name": "Nombre de batteries faibles"
+      },
+      "group_summary": {
+        "name": "Résumé du groupe"
+      },
+      "availability_today": {
+        "name": "Disponibilité (Aujourd'hui)"
+      },
+      "availability_3d": {
+        "name": "Disponibilité (3 jours)"
+      },
+      "availability_5d": {
+        "name": "Disponibilité (5 jours)"
+      },
+      "availability_7d": {
+        "name": "Disponibilité (7 jours)"
+      }
     },
     "binary_sensor": {
-      "any_offline": { "name": "Au moins un hors ligne" }
+      "any_offline": {
+        "name": "Au moins un hors ligne"
+      }
     }
   }
 }

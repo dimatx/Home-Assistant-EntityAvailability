@@ -18,7 +18,7 @@
           "staleness_threshold": "Limiar de inatividade"
         },
         "data_description": {
-          "bad_states": "Estados da entidade que indicam que está offline (ex.: indisponível, desconhecido).",
+          "bad_states": "Estados da entidade que indicam que está offline (ex.: unavailable, unknown).",
           "cooldown": "Quanto tempo (em segundos) uma entidade deve permanecer num estado negativo antes de ser marcada como offline. Evita falsos alarmes de desconexões breves.",
           "staleness_threshold": "Se uma entidade não mudou de estado durante este número de minutos, marcá-la como degradada. Isto deteta entidades que reportam 'disponível' mas que na verdade pararam de enviar dados. Defina como 0 para desativar."
         }
@@ -29,6 +29,10 @@
         "data": {
           "battery_threshold": "Limiar de bateria fraca (%, 0 = desativado)",
           "availability_windows": "Janelas de rastreio de disponibilidade"
+        },
+        "data_description": {
+          "battery_threshold": "Sinaliza entidades cuja bateria fica abaixo desta percentagem. O estado 'low' também é detetado automaticamente. Entidades baseadas em volts não são suportadas. Use entidades que reportem a bateria como percentagem ou suportem o estado 'low'.",
+          "availability_windows": "Janelas de tempo para o acompanhamento do histórico de disponibilidade do grupo (ex. hoje, 3d, 7d)."
         }
       },
       "battery_mapping": {
@@ -56,6 +60,13 @@
           "staleness_threshold": "Limiar de inatividade (minutos, 0 = desativado)",
           "battery_threshold": "Limiar de bateria fraca (%, 0 = desativado)",
           "availability_windows": "Janelas de rastreio de disponibilidade"
+        },
+        "data_description": {
+          "bad_states": "Estados de entidade que indicam que uma entidade está offline (ex. unavailable, unknown).",
+          "cooldown": "Quanto tempo (em segundos) uma entidade deve permanecer num estado mau antes de ser marcada como offline. Evita falsos alarmes por desconexões breves.",
+          "staleness_threshold": "Se uma entidade não mudou de estado durante este número de minutos, é marcada como degradada. Defina 0 para desativar.",
+          "battery_threshold": "Sinaliza entidades cuja bateria fica abaixo desta percentagem. O estado 'low' também é detetado automaticamente. Entidades baseadas em volts não são suportadas.",
+          "availability_windows": "Janelas de tempo para o acompanhamento do histórico de disponibilidade do grupo (ex. hoje, 3d, 7d)."
         }
       },
       "battery_mapping": {
@@ -66,18 +77,38 @@
   },
   "entity": {
     "sensor": {
-      "offline_count": { "name": "Contagem Offline" },
-      "offline_entities": { "name": "Entidades Offline" },
-      "low_battery": { "name": "Bateria Fraca" },
-      "low_battery_count": { "name": "Contagem bateria fraca" },
-      "group_summary": { "name": "Resumo do Grupo" },
-      "availability_today": { "name": "Disponibilidade (Hoje)" },
-      "availability_3d": { "name": "Disponibilidade (3 Dias)" },
-      "availability_5d": { "name": "Disponibilidade (5 Dias)" },
-      "availability_7d": { "name": "Disponibilidade (7 Dias)" }
+      "offline_count": {
+        "name": "Contagem Offline"
+      },
+      "offline_entities": {
+        "name": "Entidades Offline"
+      },
+      "low_battery": {
+        "name": "Bateria Fraca"
+      },
+      "low_battery_count": {
+        "name": "Contagem de Bateria Fraca"
+      },
+      "group_summary": {
+        "name": "Resumo do Grupo"
+      },
+      "availability_today": {
+        "name": "Disponibilidade (Hoje)"
+      },
+      "availability_3d": {
+        "name": "Disponibilidade (3 Dias)"
+      },
+      "availability_5d": {
+        "name": "Disponibilidade (5 Dias)"
+      },
+      "availability_7d": {
+        "name": "Disponibilidade (7 Dias)"
+      }
     },
     "binary_sensor": {
-      "any_offline": { "name": "Alguma Offline" }
+      "any_offline": {
+        "name": "Alguma Offline"
+      }
     }
   }
 }

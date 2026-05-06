@@ -132,6 +132,9 @@ The Group Summary sensor provides a complete overview in its attributes:
 | `low_battery` | Number of entities with battery below threshold |
 | `entities` | List of all monitored entity IDs in this group |
 | `battery_levels` | Dict of `{entity_id: battery_level}` for entities with battery sensors |
+| `suppressed_until` | Dict of `{entity_id: ISO datetime}` for entities with a timed suppression |
+| `stale_entities` | List of entity IDs currently considered stale (no state change beyond threshold) |
+| `offline_since` | Dict of `{entity_id: ISO datetime}` recording when each offline entity went offline |
 
 Access these in templates:
 
@@ -333,7 +336,7 @@ The integration ships with a custom card for quick health visualization. It is a
 ### Manual Installation (if auto-registration fails)
 
 1. Add the resource in **Settings > Dashboards > Resources**:
-   - URL: `/local/lovelace-entity_availability/entity-availability-card.js`
+   - URL: `/entity_availability/entity-availability-card.js`
    - Type: JavaScript Module
 
 ### Configuration
@@ -364,6 +367,7 @@ availability_colors:
 | `show_entities` | `true` | Show expandable entity list |
 | `entities_expanded` | `false` | Start entity list expanded |
 | `show_actions` | `false` | Show Suppress/Unsuppress buttons |
+| `show_entity_tooltips` | `false` | Show hover tooltip with entity details (ID, area, HA state, condition, battery, suppression) |
 | `compact` | `false` | Reduced padding mode |
 | `sort_by` | `status` | Entity list sort order: `status`, `name_asc`, `name_desc`, `battery_asc`, `battery_desc` |
 | `availability_thresholds` | `{high: 99, mid: 95}` | % thresholds for bar colors |
@@ -381,20 +385,20 @@ All options are configurable via the visual card editor UI.
 ┌───────────────────────────────────────────────┐
 │ ✓ Security Devices                    All OK  │
 ├───────────────────────────────────────────────┤
-│   Online: 5     Offline: 1     Low Battery: 1 │
+│   Online: 4   Offline: 1   Low Battery: 1     │
 ├───────────────────────────────────────────────┤
 │  Today   ██████████████████████░░░░   98.2%   │
 │  7 Days  ████████████████████░░░░░░   95.1%   │
 ├───────────────────────────────────────────────┤
 │  ▾ Entities (6)                               │
-│    Entity            State          Bat.      │
+│    Entity            Condition       Bat.     │
 │    ───────────────────────────────────────    │
-│    ● Camera 1        Online         100%      │
-│    ● Camera 2        Online          85%      │
-│    ▲ Door Lock       Low Battery     18%      │
-│    ✖ Sensor 3        Offline 12m              │
-│    ● Motion 1        Online                   │
-│    ● Smart Plug      Online                   │
+│    ● Camera 1        Online          100%     │
+│    ● Camera 2        Online           85%     │
+│    ▲ Door Lock       Low Battery      18%     │
+│    ✖ Sensor 3        Offline for 12m          │
+│    ◌ Motion 1        Stale                    │
+│    ● Smart Plug      Suppressed               │
 ├───────────────────────────────────────────────┤
 │       [Suppress All]   [Unsuppress All]       │
 └───────────────────────────────────────────────┘

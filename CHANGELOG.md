@@ -4,6 +4,32 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-05-06
+
+### Added
+- Card: hover tooltips for each entity showing Entity ID, Area, HA State (with duration), Condition (integration status), Battery, and Suppressed Until — toggle via `show_entity_tooltips` option
+- Card: stale entity detection — entities that haven't changed state beyond the staleness threshold shown with a grey dot and "Stale" status
+- Card: suppressed entities now display "Suppressed" as their condition in the entity list (green dot) instead of showing their underlying state
+- Card: timestamps beautified — durations show as "X minutes ago / X hours ago / X days ago", suppression expiry shows as "today at HH:MM" or "May 10" or "May 10, 2027"
+- Sensor: `GroupSummarySensor` attributes now include `suppressed_until` (map of entity → ISO datetime), `stale_entities` (list), and `offline_since` (map of entity → ISO datetime)
+- Model: `DeviceState` now tracks `is_stale` boolean field
+- Translations: added `data_description` help text to Advanced Settings step in all 10 supported languages (en, da, de, es, fr, it, nb, nl, pl, pt, sv) with native-speaker review
+
+### Changed
+- Card: entity status column shows single-concern condition (Suppressed / Offline for X / Stale / Low Battery / Online) — detailed HA state available in tooltip
+- Card: offline duration shown inline (e.g., "Offline for 2 hours") instead of raw state
+- Card: version bumped to 0.2.0 (visible in browser console on load)
+- Integration: Lovelace card now served directly from component directory at `/entity_availability/entity-availability-card.js` (no longer copies to `www/`)
+- Integration: card registration moved to `async_setup_entry` with a module-level `_CARD_INSTALLED` guard to prevent re-registration on config entry reload
+- Integration: duplicate Lovelace resource entries are cleaned up automatically on startup
+
+### Fixed
+- Card: custom element not appearing in the Lovelace card picker — fixed by deferring LitElement lookup to `customElements.whenDefined("ha-panel-lovelace")`
+- Card: double-load of the JS file caused by both `add_extra_js_url` and a Lovelace resource entry — removed `add_extra_js_url`
+- Card: entity tooltips clipped by `overflow: hidden` on `ha-card` and `.entity-list` — fixed with `overflow: visible`
+- Card: `<option>` `.selected` Lit binding removed (not supported); `<select>.value` binding is sufficient
+- Translations: all non-English translation files were accidentally written in English — replaced with properly translated content
+
 ## [0.1.1] - 2026-05-05
 
 ### Added

@@ -29,6 +29,10 @@
         "data": {
           "battery_threshold": "Grense for lavt batteri (%, 0 = deaktivert)",
           "availability_windows": "Tilgjengelighetssporingsvinduer"
+        },
+        "data_description": {
+          "battery_threshold": "Markerer enheter hvis batteri faller under denne prosentandelen. Tilstanden 'low' oppdages også automatisk. Volt-baserte enheter støttes ikke. Bruk enheter som rapporterer batteri som prosent eller støtter tilstanden 'low'.",
+          "availability_windows": "Tidsvinduer for sporing av gruppens tilgjengelighetshistorikk (f.eks. i dag, 3d, 7d)."
         }
       },
       "battery_mapping": {
@@ -56,6 +60,13 @@
           "staleness_threshold": "Inaktivitetsterskel (minutter, 0 = deaktivert)",
           "battery_threshold": "Grense for lavt batteri (%, 0 = deaktivert)",
           "availability_windows": "Tilgjengelighetssporingsvinduer"
+        },
+        "data_description": {
+          "bad_states": "Entitetstilstander som indikerer at en entitet er frakoblet (f.eks. unavailable, unknown).",
+          "cooldown": "Hvor lenge (i sekunder) en enhet må være i en dårlig tilstand før den merkes som frakoblet. Forhindrer falske alarmer ved korte frakoblinger.",
+          "staleness_threshold": "Hvis en enhet ikke har endret tilstand på dette antallet minutter, merkes den som forringet. Sett til 0 for å deaktivere.",
+          "battery_threshold": "Markerer enheter hvis batteri faller under denne prosentandelen. Tilstanden 'low' oppdages også automatisk. Volt-baserte enheter støttes ikke.",
+          "availability_windows": "Tidsvinduer for sporing av gruppens tilgjengelighetshistorikk (f.eks. i dag, 3d, 7d)."
         }
       },
       "battery_mapping": {
@@ -66,18 +77,38 @@
   },
   "entity": {
     "sensor": {
-      "offline_count": { "name": "Antall offline" },
-      "offline_entities": { "name": "Offline-entiteter" },
-      "low_battery": { "name": "Lavt batteri" },
-      "low_battery_count": { "name": "Antall lavt batteri" },
-      "group_summary": { "name": "Gruppeoppsummering" },
-      "availability_today": { "name": "Tilgjengelighet (i dag)" },
-      "availability_3d": { "name": "Tilgjengelighet (3 dager)" },
-      "availability_5d": { "name": "Tilgjengelighet (5 dager)" },
-      "availability_7d": { "name": "Tilgjengelighet (7 dager)" }
+      "offline_count": {
+        "name": "Antall offline"
+      },
+      "offline_entities": {
+        "name": "Offline-entiteter"
+      },
+      "low_battery": {
+        "name": "Lavt batteri"
+      },
+      "low_battery_count": {
+        "name": "Antall lavt batteri"
+      },
+      "group_summary": {
+        "name": "Gruppeoppsummering"
+      },
+      "availability_today": {
+        "name": "Tilgjengelighet (i dag)"
+      },
+      "availability_3d": {
+        "name": "Tilgjengelighet (3 dager)"
+      },
+      "availability_5d": {
+        "name": "Tilgjengelighet (5 dager)"
+      },
+      "availability_7d": {
+        "name": "Tilgjengelighet (7 dager)"
+      }
     },
     "binary_sensor": {
-      "any_offline": { "name": "Noen offline" }
+      "any_offline": {
+        "name": "Noen offline"
+      }
     }
   }
 }

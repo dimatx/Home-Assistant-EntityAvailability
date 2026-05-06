@@ -18,7 +18,7 @@
           "staleness_threshold": "Próg nieaktywności"
         },
         "data_description": {
-          "bad_states": "Stany encji wskazujące, że jest offline (np. niedostępny, nieznany).",
+          "bad_states": "Stany encji wskazujące, że encja jest offline (np. unavailable, unknown).",
           "cooldown": "Jak długo (w sekundach) encja musi pozostawać w złym stanie, zanim zostanie oznaczona jako offline. Zapobiega fałszywym alarmom wywołanym krótkimi rozłączeniami.",
           "staleness_threshold": "Jeśli encja nie zmieniła stanu przez tę liczbę minut, oznacz ją jako zdegradowaną. Wykrywa encje, które zgłaszają 'dostępność', ale przestały wysyłać dane. Ustaw na 0, aby wyłączyć."
         }
@@ -29,6 +29,10 @@
         "data": {
           "battery_threshold": "Próg niskiego poziomu baterii (%, 0 = wyłączony)",
           "availability_windows": "Okna śledzenia dostępności"
+        },
+        "data_description": {
+          "battery_threshold": "Oznacza encje, których bateria spada poniżej tego procentu. Stan 'low' jest również wykrywany automatycznie. Encje oparte na woltach nie są obsługiwane. Używaj encji raportujących poziom baterii w procentach lub obsługujących stan 'low'.",
+          "availability_windows": "Okna czasowe do śledzenia historii dostępności grupy (np. dzisiaj, 3d, 7d)."
         }
       },
       "battery_mapping": {
@@ -56,6 +60,13 @@
           "staleness_threshold": "Próg nieaktywności (minuty, 0 = wyłączony)",
           "battery_threshold": "Próg niskiego poziomu baterii (%, 0 = wyłączony)",
           "availability_windows": "Okna śledzenia dostępności"
+        },
+        "data_description": {
+          "bad_states": "Stany encji wskazujące, że encja jest offline (np. unavailable, unknown).",
+          "cooldown": "Jak długo (w sekundach) encja musi pozostawać w złym stanie, zanim zostanie oznaczona jako offline. Zapobiega fałszywym alarmom przy krótkich rozłączeniach.",
+          "staleness_threshold": "Jeśli encja nie zmieniła stanu przez tę liczbę minut, jest oznaczana jako zdegradowana. Ustaw 0, aby wyłączyć.",
+          "battery_threshold": "Oznacza encje, których bateria spada poniżej tego procentu. Stan 'low' jest również wykrywany automatycznie. Encje oparte na woltach nie są obsługiwane.",
+          "availability_windows": "Okna czasowe do śledzenia historii dostępności grupy (np. dzisiaj, 3d, 7d)."
         }
       },
       "battery_mapping": {
@@ -66,18 +77,38 @@
   },
   "entity": {
     "sensor": {
-      "offline_count": { "name": "Liczba offline" },
-      "offline_entities": { "name": "Encje offline" },
-      "low_battery": { "name": "Niski poziom baterii" },
-      "low_battery_count": { "name": "Liczba niskich baterii" },
-      "group_summary": { "name": "Podsumowanie grupy" },
-      "availability_today": { "name": "Dostępność (dzisiaj)" },
-      "availability_3d": { "name": "Dostępność (3 dni)" },
-      "availability_5d": { "name": "Dostępność (5 dni)" },
-      "availability_7d": { "name": "Dostępność (7 dni)" }
+      "offline_count": {
+        "name": "Liczba offline"
+      },
+      "offline_entities": {
+        "name": "Encje offline"
+      },
+      "low_battery": {
+        "name": "Niski poziom baterii"
+      },
+      "low_battery_count": {
+        "name": "Liczba niskich baterii"
+      },
+      "group_summary": {
+        "name": "Podsumowanie grupy"
+      },
+      "availability_today": {
+        "name": "Dostępność (dzisiaj)"
+      },
+      "availability_3d": {
+        "name": "Dostępność (3 dni)"
+      },
+      "availability_5d": {
+        "name": "Dostępność (5 dni)"
+      },
+      "availability_7d": {
+        "name": "Dostępność (7 dni)"
+      }
     },
     "binary_sensor": {
-      "any_offline": { "name": "Którakolwiek offline" }
+      "any_offline": {
+        "name": "Dowolna encja offline"
+      }
     }
   }
 }

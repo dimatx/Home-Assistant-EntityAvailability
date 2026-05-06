@@ -18,7 +18,7 @@
           "staleness_threshold": "Veralterungsschwelle"
         },
         "data_description": {
-          "bad_states": "Entitätszustände, die darauf hinweisen, dass eine Entität offline ist (z. B. nicht verfügbar, unbekannt).",
+          "bad_states": "Entitätszustände, die darauf hinweisen, dass eine Entität offline ist (z. B. unavailable, unknown).",
           "cooldown": "Wie lange (in Sekunden) eine Entität in einem schlechten Zustand bleiben muss, bevor sie als offline markiert wird. Verhindert Fehlalarme durch kurze Verbindungsunterbrechungen.",
           "staleness_threshold": "Wenn eine Entität ihren Zustand seit dieser Anzahl von Minuten nicht geändert hat, wird sie als beeinträchtigt markiert. Dies erkennt Entitäten, die 'verfügbar' melden, aber tatsächlich keine Daten mehr senden. Auf 0 setzen zum Deaktivieren."
         }
@@ -29,6 +29,10 @@
         "data": {
           "battery_threshold": "Niedriger Batterieschwellenwert (%, 0 = deaktiviert)",
           "availability_windows": "Verfügbarkeits-Tracking-Zeiträume"
+        },
+        "data_description": {
+          "battery_threshold": "Markiert Entitäten, deren Batterie unter diesen Prozentwert fällt. Der Zustand 'low' wird automatisch erkannt. Volt-basierte Entitäten werden nicht unterstützt.",
+          "availability_windows": "Zeitfenster zur Verfolgung der Gruppenverfügbarkeit (z. B. heute, 3d, 7d)."
         }
       },
       "battery_mapping": {
@@ -56,6 +60,13 @@
           "staleness_threshold": "Veralterungsschwelle (Minuten, 0 = deaktiviert)",
           "battery_threshold": "Niedriger Batterieschwellenwert (%, 0 = deaktiviert)",
           "availability_windows": "Verfügbarkeits-Tracking-Zeiträume"
+        },
+        "data_description": {
+          "bad_states": "Entitätszustände, die anzeigen, dass eine Entität offline ist (z. B. unavailable, unknown).",
+          "cooldown": "Wie lange (in Sekunden) eine Entität in einem schlechten Zustand bleiben muss, bevor sie als offline markiert wird. Verhindert Fehlalarme bei kurzen Verbindungsunterbrechungen.",
+          "staleness_threshold": "Wenn eine Entität sich für diese Anzahl von Minuten nicht geändert hat, wird sie als beeinträchtigt markiert. Auf 0 setzen zum Deaktivieren.",
+          "battery_threshold": "Markiert Entitäten, deren Batterie unter diesen Prozentwert fällt. Der Zustand 'low' wird automatisch erkannt. Volt-basierte Entitäten werden nicht unterstützt.",
+          "availability_windows": "Zeitfenster zur Verfolgung der Gruppenverfügbarkeit (z. B. heute, 3d, 7d)."
         }
       },
       "battery_mapping": {
@@ -66,18 +77,38 @@
   },
   "entity": {
     "sensor": {
-      "offline_count": { "name": "Offline-Anzahl" },
-      "offline_entities": { "name": "Offline-Entitäten" },
-      "low_battery": { "name": "Niedriger Batteriestand" },
-      "low_battery_count": { "name": "Anzahl niedriger Batteriestand" },
-      "group_summary": { "name": "Gruppenzusammenfassung" },
-      "availability_today": { "name": "Verfügbarkeit (Heute)" },
-      "availability_3d": { "name": "Verfügbarkeit (3 Tage)" },
-      "availability_5d": { "name": "Verfügbarkeit (5 Tage)" },
-      "availability_7d": { "name": "Verfügbarkeit (7 Tage)" }
+      "offline_count": {
+        "name": "Offline-Anzahl"
+      },
+      "offline_entities": {
+        "name": "Offline-Entitäten"
+      },
+      "low_battery": {
+        "name": "Niedriger Batteriestand"
+      },
+      "low_battery_count": {
+        "name": "Anzahl schwacher Batterien"
+      },
+      "group_summary": {
+        "name": "Gruppenzusammenfassung"
+      },
+      "availability_today": {
+        "name": "Verfügbarkeit (Heute)"
+      },
+      "availability_3d": {
+        "name": "Verfügbarkeit (3 Tage)"
+      },
+      "availability_5d": {
+        "name": "Verfügbarkeit (5 Tage)"
+      },
+      "availability_7d": {
+        "name": "Verfügbarkeit (7 Tage)"
+      }
     },
     "binary_sensor": {
-      "any_offline": { "name": "Beliebige offline" }
+      "any_offline": {
+        "name": "Mindestens eine offline"
+      }
     }
   }
 }

@@ -281,6 +281,7 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
                 self._availability_storage.record_offline(entity_id, elapsed, now)
 
             # Degraded = not offline but battery low or stale
+            device.is_stale = is_stale
             device.is_degraded = (not device.is_offline) and (battery_low or is_stale)
 
         # Mark as dirty; save periodically (every ~5 min)

@@ -20,7 +20,7 @@
         "data_description": {
           "bad_states": "Entitetstilstande der indikerer at en entitet er offline (f.eks. utilgængelig, ukendt).",
           "cooldown": "Hvor længe (i sekunder) en entitet skal forblive i en dårlig tilstand før den markeres som offline. Forhindrer falske alarmer fra korte afbrydelser.",
-          "staleness_threshold": "Hvis en entitet ikke har ændret tilstand i dette antal minutter, markér den som degraderet. Dette fanger entiteter der rapporterer 'tilgængelig' men faktisk er stoppet med at sende data. Sæt til 0 for at deaktivere."
+          "staleness_threshold": "Hvis en entitet ikke har ændret tilstand i dette antal minutter, markeres den som forringet. Dette opdager entiteter, der rapporterer 'tilgængelig', men faktisk er stoppet med at sende data. Sæt til 0 for at deaktivere."
         }
       },
       "advanced": {
@@ -29,6 +29,10 @@
         "data": {
           "battery_threshold": "Grænse for lavt batteri (%, 0 = deaktiveret)",
           "availability_windows": "Tilgængelighedssporingsvinduer"
+        },
+        "data_description": {
+          "battery_threshold": "Markerer entiteter, hvis batteri falder under denne procentdel. Tilstanden 'low' registreres også automatisk. Volt-baserede entiteter understøttes ikke. Brug entiteter, der rapporterer batteri som procent eller understøtter tilstanden 'low'.",
+          "availability_windows": "Tidsvinduer til sporing af gruppens tilgængelighed (f.eks. i dag, 3d, 7d)."
         }
       },
       "battery_mapping": {
@@ -56,6 +60,13 @@
           "staleness_threshold": "Inaktivitetstærskel (minutter, 0 = deaktiveret)",
           "battery_threshold": "Grænse for lavt batteri (%, 0 = deaktiveret)",
           "availability_windows": "Tilgængelighedssporingsvinduer"
+        },
+        "data_description": {
+          "bad_states": "Entitetstilstande, der indikerer, at en entitet er offline (f.eks. unavailable, unknown).",
+          "cooldown": "Hvor længe (i sekunder) en entitet skal forblive i en fejltilstand, før den markeres som offline. Forhindrer falske alarmer ved korte afbrydelser.",
+          "staleness_threshold": "Hvis en entitet ikke har skiftet tilstand i dette antal minutter, markeres den som forringet. Sæt til 0 for at deaktivere.",
+          "battery_threshold": "Markér entiteter, hvis batteri falder under denne procentdel. Tilstanden 'low' registreres også automatisk. Volt-baserede entiteter understøttes ikke.",
+          "availability_windows": "Tidsvinduer til sporing af gruppens tilgængelighed (f.eks. i dag, 3d, 7d)."
         }
       },
       "battery_mapping": {
@@ -66,18 +77,38 @@
   },
   "entity": {
     "sensor": {
-      "offline_count": { "name": "Antal offline" },
-      "offline_entities": { "name": "Offline-entiteter" },
-      "low_battery": { "name": "Lavt batteri" },
-      "low_battery_count": { "name": "Antal med lavt batteri" },
-      "group_summary": { "name": "Gruppeoversigt" },
-      "availability_today": { "name": "Tilgængelighed (i dag)" },
-      "availability_3d": { "name": "Tilgængelighed (3 dage)" },
-      "availability_5d": { "name": "Tilgængelighed (5 dage)" },
-      "availability_7d": { "name": "Tilgængelighed (7 dage)" }
+      "offline_count": {
+        "name": "Antal offline"
+      },
+      "offline_entities": {
+        "name": "Offline-entiteter"
+      },
+      "low_battery": {
+        "name": "Lavt batteri"
+      },
+      "low_battery_count": {
+        "name": "Antal med lavt batteri"
+      },
+      "group_summary": {
+        "name": "Gruppeoversigt"
+      },
+      "availability_today": {
+        "name": "Tilgængelighed (i dag)"
+      },
+      "availability_3d": {
+        "name": "Tilgængelighed (3 dage)"
+      },
+      "availability_5d": {
+        "name": "Tilgængelighed (5 dage)"
+      },
+      "availability_7d": {
+        "name": "Tilgængelighed (7 dage)"
+      }
     },
     "binary_sensor": {
-      "any_offline": { "name": "Nogen offline" }
+      "any_offline": {
+        "name": "Nogen offline"
+      }
     }
   }
 }

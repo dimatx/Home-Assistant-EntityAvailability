@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import json
 import logging
-import shutil
 from pathlib import Path
 
 from homeassistant.components.http import StaticPathConfig
+from homeassistant.components.lovelace.resources import ResourceStorageCollection
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
@@ -24,8 +24,8 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BINARY_SENSOR]
 
 CARD_FILENAME = "entity-availability-card.js"
-CARD_DIR = f"lovelace-{DOMAIN}"
-CARD_URL_BASE = f"/local/{CARD_DIR}/{CARD_FILENAME}"
+CARD_URL = f"/entity_availability/{CARD_FILENAME}"
+_CARD_INSTALLED = False
 
 
 def _get_version() -> str:
@@ -36,8 +36,7 @@ def _get_version() -> str:
 
 
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
-    """Set up the Entity Availability integration (once, before entries)."""
-    await _async_install_card(hass)
+    """Set up the Entity Availability integration."""
     return True
 
 
@@ -56,6 +55,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     entry.async_on_unload(entry.add_update_listener(_async_update_options))
 
     await async_setup_services(hass)
+    await _async_install_card(hass)
 
     return True
 
@@ -66,81 +66,79 @@ async def _async_update_options(hass: HomeAssistant, entry: ConfigEntry) -> None
 
 
 async def _async_install_card(hass: HomeAssistant) -> None:
-    """Install card JS to www/ and register as Lovelace resource."""
+    """Serve card JS from component dir and register as Lovelace resource."""
+    global _CARD_INSTALLED
+    if _CARD_INSTALLED:
+        return
+
     source = Path(__file__).parent / "frontend" / CARD_FILENAME
     if not source.exists():
         _LOGGER.warning("Card JS not found at %s", source)
         return
 
-    www_dir = Path(hass.config.path("www")) / CARD_DIR
-    dest = www_dir / CARD_FILENAME
+    version = await hass.async_add_executor_job(_get_version)
 
-    try:
-        www_dir.mkdir(parents=True, exist_ok=True)
-        if not dest.exists() or source.stat().st_mtime > dest.stat().st_mtime:
-            await hass.async_add_executor_job(shutil.copy2, source, dest)
-            _LOGGER.info("Installed %s to %s", CARD_FILENAME, dest)
-    except OSError:
-        _LOGGER.warning("Could not copy card JS to %s", dest)
-        return
-
-    # Register static path so HA serves the file
     try:
         await hass.http.async_register_static_paths(
-            [StaticPathConfig(f"/{CARD_DIR}/{CARD_FILENAME}", str(dest), True)]
+            [StaticPathConfig(CARD_URL, str(source), True)]
         )
     except Exception:  # noqa: BLE001
-        _LOGGER.debug("Static path registration skipped (may already exist)")
+        _LOGGER.debug("Static path %s already registered", CARD_URL)
 
-    # Register as Lovelace resource with version for cache busting
-    version = _get_version()
-    card_url = f"{CARD_URL_BASE}?v={version}"
-    await _async_register_lovelace_resource(hass, card_url)
+    await _async_register_lovelace_resource(hass, version)
+    _CARD_INSTALLED = True
 
 
-async def _async_register_lovelace_resource(hass: HomeAssistant, url: str) -> None:
+async def _async_register_lovelace_resource(hass: HomeAssistant, version: str) -> None:
     """Register card as Lovelace resource."""
+    resource_url = f"{CARD_URL}?automatically-added&{version}"
+
     try:
-        from homeassistant.components.lovelace import (  # noqa: PLC0415
-            DOMAIN as LOVELACE_DOMAIN,
-        )
-
-        lovelace_info = hass.data.get(LOVELACE_DOMAIN)
-        resources = None
-        if lovelace_info:
-            if hasattr(lovelace_info, "resources"):
-                resources = lovelace_info.resources
-            elif isinstance(lovelace_info, dict):
-                for dashboard in lovelace_info.values():
-                    if hasattr(dashboard, "resources"):
-                        resources = dashboard.resources
-                        break
-        if resources is None:
-            resources = hass.data.get("lovelace_resources")
-
-        if resources is not None:
-            existing = [
-                r for r in resources.async_items() if CARD_FILENAME in r.get("url", "")
-            ]
-            if existing:
-                # Update version if changed
-                for r in existing:
-                    if r.get("url") != url:
-                        await resources.async_update_item(
-                            r["id"], {"res_type": "module", "url": url}
-                        )
-                        _LOGGER.info("Updated Lovelace resource to %s", url)
-            else:
-                await resources.async_create_item({"res_type": "module", "url": url})
-                _LOGGER.info("Registered %s as Lovelace resource", url)
-        else:
-            _LOGGER.info("Add Lovelace resource manually: url: %s, type: module", url)
-    except Exception:  # noqa: BLE001
+        resources = hass.data["lovelace"].resources
+    except (KeyError, AttributeError):
         _LOGGER.info(
             "Could not auto-register Lovelace resource. "
-            "Add manually: url: %s, type: module",
-            url,
+            "Add manually: url: %s?%s, type: module",
+            CARD_URL,
+            version,
         )
+        return
+
+    if not resources.loaded:
+        await resources.async_load()
+        resources.loaded = True
+
+    existing = [
+        r for r in resources.async_items() if r.get("url", "").startswith(CARD_URL)
+    ]
+
+    if not existing:
+        if getattr(resources, "async_create_item", None):
+            await resources.async_create_item(
+                {"res_type": "module", "url": resource_url}
+            )
+            _LOGGER.info("Registered %s as Lovelace resource", resource_url)
+        elif getattr(resources, "data", None) and getattr(
+            resources.data, "append", None
+        ):
+            resources.data.append({"type": "module", "url": resource_url})
+        return
+
+    # Remove duplicates — keep only the first, update it to current version
+    for r in existing[1:]:
+        if isinstance(resources, ResourceStorageCollection):
+            await resources.async_delete_item(r["id"])
+            _LOGGER.info("Removed duplicate Lovelace resource %s", r["url"])
+
+    first = existing[0]
+    if first.get("url") != resource_url:
+        if isinstance(resources, ResourceStorageCollection):
+            await resources.async_update_item(
+                first["id"], {"res_type": "module", "url": resource_url}
+            )
+            _LOGGER.info("Updated Lovelace resource to %s", resource_url)
+        else:
+            first["url"] = resource_url
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
