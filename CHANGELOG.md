@@ -2,45 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
-
-### Fixed
-- Integration: legacy Lovelace resource entries (e.g. from prior HACS installs under `/hacsfiles/` or `/local/community/` paths) are now detected and removed on startup — fixes duplicate resource entries in Settings → Resources
-- Card: entity states that are ISO timestamps (e.g. `last_seen` sensors) are now formatted as human-readable date and time (e.g. `Oct 15 · 14:30`) in `entity_detail` rows instead of showing the raw ISO string; non-timestamp states like `on`, `off`, `unavailable` are unaffected
-
-## [0.2.0] - 2026-05-06
+## [0.2.0] - 2026-05-07
 
 ### Added
-- Card: `entity_detail` option (`"off"` / `"tooltip"` / `"inline"`) replaces `show_entity_tooltips` boolean
-  - `"tooltip"`: hover tooltip showing Entity ID, Area, HA State + duration, Condition, Battery, Suppressed Until
-  - `"inline"`: same detail always visible as a block under each entity row; when combined with `compact: true`, shows only HA State + duration (ideal for "last seen" at a glance)
-- Card: `entity_filter` option (`"all"` / `"offline"` / `"online"`) — filter entity list by health status
-  - `"offline"`: shows only problem entities (offline, stale, low battery)
-  - `"online"`: shows only healthy entities
-  - Section title and count update to reflect filter: "Offline Entities (2/6)" / "Healthy Entities (4/6)"
-- Card: stale entity detection — entities that haven't changed state beyond the staleness threshold shown with a grey dot and "Stale" status
-- Card: suppressed entities now display "Suppressed" as their condition in the entity list (green dot) instead of showing their underlying state
-- Card: timestamps beautified — durations show as "X minutes ago / X hours ago / X days ago", suppression expiry shows as "today at HH:MM" or "May 10" or "May 10, 2027"
-- Sensor: `GroupSummarySensor` attributes now include `suppressed_until` (map of entity → ISO datetime), `stale_entities` (list), and `offline_since` (map of entity → ISO datetime)
-- Model: `DeviceState` now tracks `is_stale` boolean field
-- Translations: added `data_description` help text to Advanced Settings step in all 10 supported languages (en, da, de, es, fr, it, nb, nl, pl, pt, sv) with native-speaker review
+- Card: `entity_detail` option — `"off"` / `"tooltip"` / `"inline"` (replaces `show_entity_tooltips`)
+- Card: `entity_filter` option — `"all"` / `"offline"` / `"online"` to filter entity list by health status
+- Card: stale entity detection — grey dot + "Stale" for entities past the staleness threshold
+- Card: human-readable durations and timestamps throughout (e.g. "2 hours ago", "today at 14:30")
+- Sensor: `suppressed_until`, `stale_entities`, `offline_since` added to `GroupSummarySensor` attributes
+- Translations: config flow help text added for all 10 supported languages
 
 ### Changed
-- Card: entity status column shows single-concern condition (Suppressed / Offline for X / Stale / Low Battery / Online) — detailed HA state available via `entity_detail`
-- Card: offline duration shown inline (e.g., "Offline for 2 hours") instead of raw state
-- Integration: Lovelace card now served directly from component directory at `/entity_availability/entity-availability-card.js` (no longer copies to `www/`)
-- Integration: card registration moved to `async_setup_entry` with a module-level `_CARD_INSTALLED` guard to prevent re-registration on config entry reload
-- Integration: duplicate Lovelace resource entries are cleaned up automatically on startup
+- Card: entity status shows single-concern label (Suppressed / Offline for X / Stale / Low Battery / Online)
+- Integration: card JS served directly from component directory, no longer copied to `www/`
+- Integration: stale Lovelace resource entries cleaned up automatically on startup
 
 ### Fixed
-- Card: custom element not appearing in the Lovelace card picker — fixed by deferring LitElement lookup to `customElements.whenDefined("ha-panel-lovelace")`
-- Card: double-load of the JS file caused by both `add_extra_js_url` and a Lovelace resource entry — removed `add_extra_js_url`
-- Card: entity tooltips clipped by `overflow: hidden` on `ha-card` and `.entity-list` — fixed with `overflow: visible`
-- Card: `<option>` `.selected` Lit binding removed (not supported); `<select>.value` binding is sufficient
-- Translations: all non-English translation files were accidentally written in English — replaced with properly translated content
+- Card: custom element missing from card picker after fresh install
+- Card: JS file loaded twice causing conflicts
+- Card: entity tooltips clipped by overflow hidden
+- Translations: non-English files were accidentally written in English
 
 ### Migration
-- `show_entity_tooltips: true` automatically maps to `entity_detail: "tooltip"` — existing cards are not broken
+- `show_entity_tooltips: true` automatically maps to `entity_detail: "tooltip"` — no action needed
 
 ## [0.1.1] - 2026-05-05
 
