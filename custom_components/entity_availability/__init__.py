@@ -108,9 +108,7 @@ async def _async_register_lovelace_resource(hass: HomeAssistant, version: str) -
         await resources.async_load()
         resources.loaded = True
 
-    existing = [
-        r for r in resources.async_items() if CARD_FILENAME in r.get("url", "")
-    ]
+    existing = [r for r in resources.async_items() if CARD_FILENAME in r.get("url", "")]
 
     if not existing:
         if getattr(resources, "async_create_item", None):
