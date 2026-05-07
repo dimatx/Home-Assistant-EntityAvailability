@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- Integration: legacy Lovelace resource entries (e.g. from prior HACS installs under `/hacsfiles/` or `/local/community/` paths) are now detected and removed on startup — fixes duplicate resource entries in Settings → Resources
+
 ## [0.2.0] - 2026-05-06
 
 ### Added
