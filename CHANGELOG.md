@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 - Integration: legacy Lovelace resource entries (e.g. from prior HACS installs under `/hacsfiles/` or `/local/community/` paths) are now detected and removed on startup — fixes duplicate resource entries in Settings → Resources
+- Card: entity states that are ISO timestamps (e.g. `last_seen` sensors) are now formatted as human-readable date and time (e.g. `Oct 15 · 14:30`) in `entity_detail` rows instead of showing the raw ISO string; non-timestamp states like `on`, `off`, `unavailable` are unaffected
 
 ## [0.2.0] - 2026-05-06
 

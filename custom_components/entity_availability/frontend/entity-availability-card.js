@@ -810,7 +810,7 @@ class EntityAvailabilityCard extends LitElement {
     return [
       { label: "Entity ID", value: item.entityId },
       areaName ? { label: "Area", value: areaName } : null,
-      { label: "HA State", value: lastChanged ? `${entityState.state} · ${lastChanged}` : (entityState?.state || "unknown") },
+      { label: "HA State", value: lastChanged ? `${this._formatIsoState(entityState.state)} · ${lastChanged}` : this._formatIsoState(entityState?.state || "unknown") },
       { label: "Condition", value: suppressedUntil ? "Suppressed" : item.isOffline ? `Offline for ${item.status}` : item.status },
       item.battery !== null ? { label: "Battery", value: `${item.battery}%` } : null,
       suppressedUntil ? { label: "Suppressed", value: `until ${suppressedUntil}` } : null,
@@ -840,8 +840,8 @@ class EntityAvailabilityCard extends LitElement {
         ? this._computeDuration(item.entityId)
         : null;
       const haStateValue = lastChanged
-        ? `${entityState.state} · ${lastChanged}`
-        : (entityState?.state || "unknown");
+        ? `${this._formatIsoState(entityState.state)} · ${lastChanged}`
+        : this._formatIsoState(entityState?.state || "unknown");
       rows = [{ label: "HA State", value: haStateValue }];
     } else {
       rows = this._buildDetailRows(item, suppressedUntilMap);
@@ -916,6 +916,18 @@ class EntityAvailabilityCard extends LitElement {
       month: "short",
       day: "numeric",
       ...(sameYear ? {} : { year: "numeric" }),
+    });
+  }
+
+  _formatIsoState(stateValue) {
+    if (!/^\d{4}-\d{2}-\d{2}T/.test(stateValue)) return stateValue;
+    const date = new Date(stateValue);
+    if (isNaN(date.getTime())) return stateValue;
+    const sameYear = date.getFullYear() === new Date().getFullYear();
+    return date.toLocaleString(undefined, {
+      month: "short", day: "numeric",
+      ...(sameYear ? {} : { year: "numeric" }),
+      hour: "2-digit", minute: "2-digit",
     });
   }
 
