@@ -677,7 +677,9 @@ async def test_suppressed_entity_skips_availability_storage(
         await coord._async_update_data()
 
     assert record_online_calls == [], "suppressed entity should not record online time"
-    assert record_offline_calls == [], "suppressed entity should not record offline time"
+    assert record_offline_calls == [], (
+        "suppressed entity should not record offline time"
+    )
 
 
 async def test_device_state_persistence_prevents_restart_retrigger(
@@ -859,4 +861,3 @@ async def test_battery_map_falsy_returns_none(
         assert device_a.battery_level is None, (
             f"falsy map value {falsy_value!r} should produce battery_level=None"
         )
-
