@@ -189,7 +189,7 @@ For example, a combined group named "All Devices" produces the slug `all_devices
 
 | Entity | Type | State | Notes |
 |--------|------|-------|-------|
-| `sensor..._combined_summary` | Sensor | Total offline count across all source groups | Attributes: `total_entities`, `online`, `offline`, `stale`, `low_battery`, `suppressed`, `groups`, `offline_entities`, `low_battery_entities` |
+| `sensor..._combined_summary` | Sensor | Total offline count across all source groups | Attributes: `total_entities`, `online`, `offline`, `stale`, `low_battery`, `suppressed`, `groups`, `offline_entities`, `low_battery_entities`. The `groups` attribute is a dict keyed by group name: `{group_name: {total, online, offline, stale, low_battery, suppressed}}` |
 | `sensor..._offline_entities` | Sensor | Comma-separated names of offline entities (`"None"` when all online) | Attributes: `entities` (list of entity IDs), `count` |
 | `sensor..._low_battery` | Sensor | Comma-separated names of low battery entities (`"None"` when all OK) | Attributes: `devices` (dict of entity ID → battery level), `count` |
 | `sensor..._low_battery_count` | Sensor | Number of entities with low battery across all groups | — |
@@ -321,6 +321,39 @@ automation:
           title: "All Entities Online"
           message: "All security devices are back online."
 ```
+
+### Trigger on every offline change (combined groups)
+
+Using `binary_sensor.*_any_offline` only fires when the state changes from `off` to `on`. If the sensor is already `on` and another device goes offline, no trigger fires because the state does not change.
+
+Use `sensor.*_offline_count` instead — it fires on every count change, up or down:
+
+```yaml
+automation:
+  - alias: "Notify every offline change"
+    trigger:
+      - platform: state
+        entity_id: sensor.entity_availability_all_devices_offline_count
+    condition:
+      - condition: template
+        value_template: "{{ trigger.from_state.state != trigger.to_state.state }}"
+    action:
+      - service: notify.mobile_app
+        data:
+          title: "Device Status Changed"
+          message: >
+            {{ trigger.to_state.state | int }} device(s) currently offline.
+```
+
+The `!=` condition fires on both increase (new offline device) and decrease (device recovered), so you can use a single automation to alert and auto-clear.
+
+For combined groups you can also read `low_battery` directly from the summary sensor attributes:
+
+```yaml
+{{ state_attr('sensor.entity_availability_all_devices_combined_summary', 'low_battery') | int(0) }}
+```
+
+This is equivalent to `states('sensor.entity_availability_all_devices_low_battery_count')`.
 
 ### Daily availability report
 
@@ -517,7 +550,7 @@ A: No. Entity Availability uses its own `.storage` file for tracking history. Th
 A: This is normal. Availability sensors need time to collect data before they can report a percentage. For "today" they need at least one 5-minute data point; for longer windows (3d, 7d) they need at least 10% of expected data. They will populate automatically as the integration runs.
 
 **Q: What happens after a Home Assistant restart?**
-A: Historical availability data is stored in `.storage` and survives restarts. The integration resumes tracking immediately.
+A: Historical availability data is stored in `.storage` and survives restarts. The integration resumes tracking immediately. Offline alerts are suppressed for the first 60 seconds after startup to avoid false-positive notifications for entities that are already offline before HA finishes loading.
 
 **Q: Can I monitor the same entity in multiple groups?**
 A: Yes. An entity can belong to multiple groups simultaneously.

@@ -22,7 +22,7 @@ Monitor entity availability across your Home Assistant setup. Track offline enti
 - Configurable entity sort order in card — by status, name, or battery level (ascending/descending)
 - Customizable availability bar colors and thresholds
 - Optional suppress/unsuppress action buttons in card
-- Survives HA restarts — history persisted via HA Store, no recorder dependency
+- Survives HA restarts — history persisted via HA Store, no recorder dependency; startup false-positive alerts suppressed for 60 seconds
 
 ## Setup
 
