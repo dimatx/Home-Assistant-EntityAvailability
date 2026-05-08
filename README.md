@@ -504,7 +504,7 @@ Selecting a combined group hides editor controls that don't apply (availability 
 └───────────────────────────────────────────────┘
 ```
 
-![Card — Combined Group](custom_components/entity_availability/docs/11_card_combined_group.png)
+![Card — Side by Side](custom_components/entity_availability/docs/11_card_side_by_side.png)
 
 ---
 
