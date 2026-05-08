@@ -1,0 +1,316 @@
+"""Combined group sensor for Entity Availability."""
+
+from __future__ import annotations
+
+import logging
+from collections.abc import Callable
+from typing import Any
+
+from homeassistant.components.sensor import SensorEntity, SensorStateClass
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
+
+from .const import (
+    CONF_COMBINED_GROUPS,
+    CONF_GROUP_NAME,
+    DOMAIN,
+)
+from .coordinator import EntityAvailabilityCoordinator
+
+_LOGGER = logging.getLogger(__name__)
+
+MAX_STATE_LENGTH = 255
+
+
+async def async_setup_entry(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    async_add_entities: AddEntitiesCallback,
+) -> None:
+    """Set up combined group sensors."""
+    group_name = entry.data[CONF_GROUP_NAME]
+    group_slug = group_name.lower().replace(" ", "_")
+    combined_entry_ids: list[str] = entry.data.get(CONF_COMBINED_GROUPS, [])
+
+    coordinators: list[EntityAvailabilityCoordinator] = [
+        hass.data[DOMAIN][eid] for eid in combined_entry_ids if eid in hass.data[DOMAIN]
+    ]
+
+    async_add_entities(
+        [
+            CombinedGroupSensor(
+                hass, entry, group_name, group_slug, coordinators, combined_entry_ids
+            ),
+            CombinedOfflineEntitiesSensor(
+                hass, entry, group_name, group_slug, coordinators, combined_entry_ids
+            ),
+            CombinedLowBatterySensor(
+                hass, entry, group_name, group_slug, coordinators, combined_entry_ids
+            ),
+            CombinedLowBatteryCountSensor(
+                hass, entry, group_name, group_slug, coordinators, combined_entry_ids
+            ),
+        ]
+    )
+
+
+def _device_info(entry_id: str, group_name: str) -> DeviceInfo:
+    return DeviceInfo(
+        identifiers={(DOMAIN, entry_id)},
+        name=f"Entity Availability - [Combined] {group_name}",
+        manufacturer="Entity Availability",
+        entry_type=DeviceEntryType.SERVICE,
+    )
+
+
+def _friendly_name(hass: HomeAssistant, entity_id: str) -> str:
+    state = hass.states.get(entity_id)
+    if state and state.attributes.get("friendly_name"):
+        return state.attributes["friendly_name"]
+    return entity_id.split(".")[-1].replace("_", " ").title()
+
+
+class CombinedSensorBase(SensorEntity):
+    """Base class for combined group sensors — handles coordinator subscriptions."""
+
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        entry: ConfigEntry,
+        group_name: str,
+        group_slug: str,
+        coordinators: list[EntityAvailabilityCoordinator],
+        combined_entry_ids: list[str],
+    ) -> None:
+        self.hass = hass
+        self._entry = entry
+        self._coordinators = coordinators
+        self._combined_entry_ids = combined_entry_ids
+        self._attr_device_info = _device_info(entry.entry_id, group_name)
+        self._unsub_listeners: list[Callable[[], None]] = []
+
+    async def async_added_to_hass(self) -> None:
+        @callback
+        def _on_coordinator_update() -> None:
+            self.async_write_ha_state()
+
+        for coordinator in self._coordinators:
+            self._unsub_listeners.append(
+                coordinator.async_add_listener(_on_coordinator_update)
+            )
+
+    async def async_will_remove_from_hass(self) -> None:
+        for unsub in self._unsub_listeners:
+            unsub()
+        self._unsub_listeners.clear()
+
+    def _active_coordinators(self) -> list[EntityAvailabilityCoordinator]:
+        domain_data = self.hass.data.get(DOMAIN, {})
+        return [c for c in self._coordinators if c.entry.entry_id in domain_data]
+
+
+class CombinedGroupSensor(CombinedSensorBase):
+    """Sensor aggregating offline count across multiple groups."""
+
+    _attr_icon = "mdi:format-list-group"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(
+        self, hass, entry, group_name, group_slug, coordinators, combined_entry_ids
+    ):
+        super().__init__(
+            hass, entry, group_name, group_slug, coordinators, combined_entry_ids
+        )
+        self._attr_unique_id = f"{entry.entry_id}_combined_summary"
+        self._attr_name = "Combined Summary"
+
+    @property
+    def native_value(self) -> int:
+        return sum(
+            1
+            for coord in self._active_coordinators()
+            for d in coord.device_states.values()
+            if d.is_offline and not d.is_suppressed
+        )
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        total = online = offline = stale = low_battery = suppressed = 0
+        offline_entities: list[str] = []
+        low_battery_entities: list[str] = []
+        groups: dict[str, Any] = {}
+
+        for coord in self._active_coordinators():
+            states = coord.device_states
+            g_total = len(coord.monitored_entities)
+            g_offline = sum(
+                1 for d in states.values() if d.is_offline and not d.is_suppressed
+            )
+            g_suppressed = sum(1 for d in states.values() if d.is_suppressed)
+            g_online = g_total - g_offline - g_suppressed
+            g_stale = sum(
+                1 for d in states.values() if d.is_stale and not d.is_suppressed
+            )
+            g_low_battery = sum(
+                1
+                for d in states.values()
+                if d.is_degraded and not d.is_suppressed and d.battery_level is not None
+            )
+            total += g_total
+            online += g_online
+            offline += g_offline
+            stale += g_stale
+            low_battery += g_low_battery
+            suppressed += g_suppressed
+            offline_entities += [
+                d.entity_id
+                for d in states.values()
+                if d.is_offline and not d.is_suppressed
+            ]
+            low_battery_entities += [
+                d.entity_id
+                for d in states.values()
+                if d.is_degraded and not d.is_suppressed and d.battery_level is not None
+            ]
+            gname = coord.group_name
+            groups[gname] = {
+                "total": g_total,
+                "online": g_online,
+                "offline": g_offline,
+                "stale": g_stale,
+                "low_battery": g_low_battery,
+                "suppressed": g_suppressed,
+            }
+
+        attrs: dict[str, Any] = {
+            "total_entities": total,
+            "online": online,
+            "offline": offline,
+            "stale": stale,
+            "low_battery": low_battery,
+            "suppressed": suppressed,
+            "groups": groups,
+            "offline_entities": offline_entities,
+            "low_battery_entities": low_battery_entities,
+        }
+        missing = [
+            eid
+            for eid in self._combined_entry_ids
+            if eid not in self.hass.data.get(DOMAIN, {})
+        ]
+        if missing:
+            attrs["missing_groups"] = missing
+        return attrs
+
+
+class CombinedOfflineEntitiesSensor(CombinedSensorBase):
+    """Sensor showing comma-separated list of offline entities across all included groups."""
+
+    _attr_icon = "mdi:devices"
+
+    def __init__(
+        self, hass, entry, group_name, group_slug, coordinators, combined_entry_ids
+    ):
+        super().__init__(
+            hass, entry, group_name, group_slug, coordinators, combined_entry_ids
+        )
+        self._attr_unique_id = f"{entry.entry_id}_combined_offline_entities"
+        self._attr_name = "Offline Entities"
+
+    @property
+    def native_value(self) -> str:
+        offline = [
+            _friendly_name(self.hass, d.entity_id)
+            for coord in self._active_coordinators()
+            for d in coord.device_states.values()
+            if d.is_offline and not d.is_suppressed
+        ]
+        if not offline:
+            return "None"
+        result = ", ".join(offline)
+        return (
+            result[: MAX_STATE_LENGTH - 3] + "..."
+            if len(result) > MAX_STATE_LENGTH - 3
+            else result
+        )
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        offline = [
+            d.entity_id
+            for coord in self._active_coordinators()
+            for d in coord.device_states.values()
+            if d.is_offline and not d.is_suppressed
+        ]
+        return {"entities": offline, "count": len(offline)}
+
+
+class CombinedLowBatterySensor(CombinedSensorBase):
+    """Sensor showing comma-separated list of low battery entities across all included groups."""
+
+    _attr_icon = "mdi:battery-alert"
+
+    def __init__(
+        self, hass, entry, group_name, group_slug, coordinators, combined_entry_ids
+    ):
+        super().__init__(
+            hass, entry, group_name, group_slug, coordinators, combined_entry_ids
+        )
+        self._attr_unique_id = f"{entry.entry_id}_combined_low_battery"
+        self._attr_name = "Low Battery"
+
+    @property
+    def native_value(self) -> str:
+        low = [
+            f"{_friendly_name(self.hass, d.entity_id)} ({d.battery_level}%)"
+            for coord in self._active_coordinators()
+            for d in coord.device_states.values()
+            if d.is_degraded and not d.is_suppressed and d.battery_level is not None
+        ]
+        if not low:
+            return "None"
+        result = ", ".join(low)
+        return (
+            result[: MAX_STATE_LENGTH - 3] + "..."
+            if len(result) > MAX_STATE_LENGTH - 3
+            else result
+        )
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        devices: dict[str, Any] = {
+            d.entity_id: f"{d.battery_level}%"
+            for coord in self._active_coordinators()
+            for d in coord.device_states.values()
+            if d.is_degraded and not d.is_suppressed and d.battery_level is not None
+        }
+        return {"devices": devices, "count": len(devices)}
+
+
+class CombinedLowBatteryCountSensor(CombinedSensorBase):
+    """Sensor showing total low battery count across all included groups."""
+
+    _attr_icon = "mdi:battery-alert-variant-outline"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(
+        self, hass, entry, group_name, group_slug, coordinators, combined_entry_ids
+    ):
+        super().__init__(
+            hass, entry, group_name, group_slug, coordinators, combined_entry_ids
+        )
+        self._attr_unique_id = f"{entry.entry_id}_combined_low_battery_count"
+        self._attr_name = "Low Battery Count"
+
+    @property
+    def native_value(self) -> int:
+        return sum(
+            1
+            for coord in self._active_coordinators()
+            for d in coord.device_states.values()
+            if d.is_degraded and not d.is_suppressed and d.battery_level is not None
+        )

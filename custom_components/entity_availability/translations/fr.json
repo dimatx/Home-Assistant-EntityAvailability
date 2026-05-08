@@ -2,11 +2,26 @@
   "config": {
     "step": {
       "user": {
+        "title": "Créer une entrée",
+        "description": "Surveiller un groupe d'entités ou combiner des groupes existants.",
+        "data": {
+          "entry_type": "Type"
+        }
+      },
+      "group": {
         "title": "Créer un groupe d'entités",
         "description": "Créez un groupe d'entités à surveiller pour la disponibilité.",
         "data": {
           "group_name": "Nom du groupe",
           "entities": "Entités à surveiller"
+        }
+      },
+      "combined": {
+        "title": "Créer un groupe combiné",
+        "description": "Combinez plusieurs groupes en une vue pour les automatisations et les tableaux de bord.",
+        "data": {
+          "group_name": "Nom du groupe combiné",
+          "combined_groups": "Groupes à inclure"
         }
       },
       "monitoring": {
@@ -42,10 +57,12 @@
     },
     "error": {
       "empty_group_name": "Le nom du groupe ne peut pas être vide.",
-      "no_entities": "Vous devez sélectionner au moins une entité."
+      "no_entities": "Vous devez sélectionner au moins une entité.",
+      "not_enough_groups_selected": "Sélectionnez au moins deux groupes à combiner."
     },
     "abort": {
-      "already_configured": "Un groupe avec ce nom existe déjà."
+      "already_configured": "Un groupe avec ce nom existe déjà.",
+      "not_enough_groups": "Vous devez avoir au moins deux groupes avant de créer un groupe combiné."
     }
   },
   "options": {
@@ -67,6 +84,14 @@
           "staleness_threshold": "Si une entité n'a pas changé d'état depuis ce nombre de minutes, elle est marquée comme dégradée. Définir à 0 pour désactiver.",
           "battery_threshold": "Signale les entités dont la batterie passe en dessous de ce pourcentage. L'état 'low' est également détecté automatiquement. Les entités basées sur les volts ne sont pas prises en charge.",
           "availability_windows": "Fenêtres de temps pour le suivi de l'historique de disponibilité du groupe (p. ex. aujourd'hui, 3j, 7j)."
+        }
+      },
+      "combined_init": {
+        "title": "Modifier le groupe combiné",
+        "description": "Modifier le nom et les groupes inclus dans ce groupe combiné.",
+        "data": {
+          "group_name": "Nom du groupe combiné",
+          "combined_groups": "Groupes à inclure"
         }
       },
       "battery_mapping": {
@@ -92,6 +117,9 @@
       "group_summary": {
         "name": "Résumé du groupe"
       },
+      "combined_summary": {
+        "name": "Résumé combiné"
+      },
       "availability_today": {
         "name": "Disponibilité (Aujourd'hui)"
       },
@@ -108,6 +136,17 @@
     "binary_sensor": {
       "any_offline": {
         "name": "Au moins un hors ligne"
+      },
+      "combined_any_offline": {
+        "name": "Au moins un hors ligne"
+      }
+    }
+  },
+  "selector": {
+    "entry_type": {
+      "options": {
+        "group": "Surveiller des entités",
+        "combined_group": "Combiner des groupes"
       }
     }
   }

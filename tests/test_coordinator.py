@@ -20,6 +20,7 @@ from custom_components.entity_availability.const import (
     DEFAULT_COOLDOWN,
     DEFAULT_STALENESS_THRESHOLD,
     DOMAIN,
+    STARTUP_GRACE_PERIOD,
 )
 from custom_components.entity_availability.coordinator import (
     EntityAvailabilityCoordinator,
@@ -489,3 +490,91 @@ async def test_battery_low_text_state(
     device_a = coord.device_states["binary_sensor.device_a"]
     assert device_a.battery_level == 0
     assert device_a.is_degraded is True
+
+
+async def test_startup_grace_blocks_new_offline_transitions(
+    mock_hass: HomeAssistant, mock_config_entry
+) -> None:
+    """During startup grace period, new offline transitions are suppressed."""
+    hass = mock_hass
+    hass.states.async_set("binary_sensor.device_a", STATE_UNAVAILABLE)
+
+    with patch.object(
+        EntityAvailabilityCoordinator, "_async_save_storage", new_callable=AsyncMock
+    ):
+        coord = EntityAvailabilityCoordinator(hass, mock_config_entry)
+        # Simulate startup: set startup_time to now (still within grace period)
+        coord._startup_time = datetime.now(timezone.utc)
+        coord._last_update = None
+
+        # Run cooldown well past threshold by backdating cooldown_start
+        await coord._async_update_data()
+
+        coord._device_states["binary_sensor.device_a"].cooldown_start = datetime.now(
+            timezone.utc
+        ) - timedelta(seconds=DEFAULT_COOLDOWN + 10)
+        await coord._async_update_data()
+
+    # Grace period active — transition must be blocked
+    assert coord.device_states["binary_sensor.device_a"].is_offline is False
+
+
+async def test_startup_grace_allows_transition_after_expiry(
+    mock_hass: HomeAssistant, mock_config_entry
+) -> None:
+    """After grace period expires, offline transitions proceed normally."""
+    hass = mock_hass
+    hass.states.async_set("binary_sensor.device_a", STATE_UNAVAILABLE)
+
+    with patch.object(
+        EntityAvailabilityCoordinator, "_async_save_storage", new_callable=AsyncMock
+    ):
+        coord = EntityAvailabilityCoordinator(hass, mock_config_entry)
+        # Startup time in the past — grace period expired
+        coord._startup_time = datetime.now(timezone.utc) - timedelta(
+            seconds=STARTUP_GRACE_PERIOD + 10
+        )
+        coord._last_update = None
+        await coord._async_update_data()
+        coord._device_states["binary_sensor.device_a"].cooldown_start = datetime.now(
+            timezone.utc
+        ) - timedelta(seconds=DEFAULT_COOLDOWN + 10)
+        await coord._async_update_data()
+
+    assert coord.device_states["binary_sensor.device_a"].is_offline is True
+
+
+async def test_device_state_persistence_prevents_restart_retrigger(
+    mock_hass: HomeAssistant, mock_config_entry
+) -> None:
+    """Offline state persisted and restored — no False→True transition on restart."""
+    hass = mock_hass
+    hass.states.async_set("binary_sensor.device_a", STATE_UNAVAILABLE)
+
+    offline_since = datetime.now(timezone.utc) - timedelta(hours=1)
+
+    with patch.object(
+        EntityAvailabilityCoordinator, "_async_save_storage", new_callable=AsyncMock
+    ):
+        coord = EntityAvailabilityCoordinator(hass, mock_config_entry)
+
+        # Simulate what _async_load_storage restores: device was already offline
+        from custom_components.entity_availability.models import DeviceState
+
+        restored = DeviceState(entity_id="binary_sensor.device_a")
+        restored.is_offline = True
+        restored.offline_since = offline_since
+        coord._device_states["binary_sensor.device_a"] = restored
+
+        # Grace period expired (simulating past startup)
+        coord._startup_time = datetime.now(timezone.utc) - timedelta(
+            seconds=STARTUP_GRACE_PERIOD + 10
+        )
+        coord._last_update = None
+        await coord._async_update_data()
+
+    device_a = coord.device_states["binary_sensor.device_a"]
+    # Still offline — no transition — no automation trigger
+    assert device_a.is_offline is True
+    # offline_since preserved from storage, not reset
+    assert device_a.offline_since == offline_since

@@ -17,10 +17,12 @@ from .const import (
     CONF_AVAILABILITY_WINDOWS,
     CONF_BATTERY_ENTITY_MAP,
     CONF_BATTERY_THRESHOLD,
+    CONF_ENTRY_TYPE,
     CONF_GROUP_NAME,
     DEFAULT_AVAILABILITY_WINDOWS,
     DEFAULT_BATTERY_THRESHOLD,
     DOMAIN,
+    ENTRY_TYPE_COMBINED,
 )
 from .coordinator import EntityAvailabilityCoordinator
 
@@ -35,6 +37,12 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Entity Availability sensors."""
+    if entry.data.get(CONF_ENTRY_TYPE) == ENTRY_TYPE_COMBINED:
+        from .combined_sensor import async_setup_entry as _combined
+
+        await _combined(hass, entry, async_add_entities)
+        return
+
     coordinator: EntityAvailabilityCoordinator = hass.data[DOMAIN][entry.entry_id]
     group_name = entry.data[CONF_GROUP_NAME]
     group_slug = group_name.lower().replace(" ", "_")

@@ -13,6 +13,7 @@ Monitor entity availability in Home Assistant. Track offline entities, availabil
 ## Features
 
 - **Multi-group support** -- organize entities by function (Security, Climate, Media, etc.)
+- **Combined groups** -- merge multiple groups into a single aggregate sensor set for cross-group automations (offline count, low battery, any-offline binary sensor)
 - **Configurable bad states** -- define which states count as offline (`unavailable`, `unknown`, or custom)
 - **Cooldown timer** -- ignore brief blips before marking an entity offline
 - **Availability % sensors** -- track uptime over today, 3-day, 5-day, and 7-day windows
@@ -83,9 +84,7 @@ If you enable battery monitoring, a confirmation step appears showing each monit
 - **Override** with a different battery sensor
 - **Leave empty** for entities that don't have batteries (e.g., smart plugs, cloud services)
 
-Auto-detection strategies:
-1. Device registry -- finds battery sensors on the same HA device
-2. Convention -- checks for `sensor.{entity_name}_battery`
+Auto-detection checks battery sensors linked to the same device in Home Assistant, or sensors named `sensor.{entity_name}_battery`.
 
 Battery sensors that report `low` (text) are supported in addition to numeric percentages.
 
@@ -132,9 +131,9 @@ The Group Summary sensor provides a complete overview in its attributes:
 | `low_battery` | Number of entities with battery below threshold |
 | `entities` | List of all monitored entity IDs in this group |
 | `battery_levels` | Dict of `{entity_id: battery_level}` for entities with battery sensors |
-| `suppressed_until` | Dict of `{entity_id: ISO datetime}` for entities with a timed suppression |
-| `stale_entities` | List of entity IDs currently considered stale (no state change beyond threshold) |
-| `offline_since` | Dict of `{entity_id: ISO datetime}` recording when each offline entity went offline |
+| `suppressed_until` | Which entities are suppressed and when the suppression expires |
+| `stale_entities` | Entities that haven't reported a state change longer than the staleness threshold |
+| `offline_since` | When each currently offline entity first went offline |
 
 Access these in templates:
 
@@ -154,20 +153,75 @@ When an entity comes back online, the `offline_count` sensor includes:
 
 ---
 
+## Combined Groups
+
+A combined group aggregates two or more monitored groups into a single set of sensors. This is useful when you want cross-group automations -- for example, alerting when anything across your entire home is offline, or tracking a single "whole-home availability" figure, without duplicating entities across groups.
+
+<!-- screenshot: config flow type selector step showing "Monitor entities" vs "Combine groups" options -->
+
+### Setting Up a Combined Group
+
+1. Go to **Settings > Devices & Services > Add Integration > Entity Availability**.
+2. On the type selector step, choose **Combine groups**.
+3. Enter a name for the combined group (e.g., "All Devices") and select two or more existing Entity Availability groups to include.
+4. Click **Submit**.
+
+<!-- screenshot: config flow combined group step showing the name field and group multi-select picker -->
+
+No additional configuration steps are required. The combined group reads live data from its source groups and updates whenever any of them change.
+
+### Sensors Created
+
+All entity IDs use the prefix `entity_availability_` followed by the combined group slug.
+
+For example, a combined group named "All Devices" produces the slug `all_devices`:
+
+| Entity | Type | State | Notes |
+|--------|------|-------|-------|
+| `sensor..._combined_summary` | Sensor | Total offline count across all source groups | Attributes: `total_entities`, `online`, `offline`, `stale`, `low_battery`, `suppressed`, `groups`, `offline_entities`, `low_battery_entities` |
+| `sensor..._offline_entities` | Sensor | Comma-separated names of offline entities (`"None"` when all online) | Attributes: `entities` (list of entity IDs), `count` |
+| `sensor..._low_battery` | Sensor | Comma-separated names of low battery entities (`"None"` when all OK) | Attributes: `devices` (dict of entity ID → battery level), `count` |
+| `sensor..._low_battery_count` | Sensor | Number of entities with low battery across all groups | — |
+| `binary_sensor..._any_offline` | Binary Sensor (Problem) | ON when any entity across all groups is offline | Attributes: `offline_entities`, `offline_count` |
+
+Suppressed entities are excluded from all combined sensor states, consistent with per-group behaviour.
+
+<!-- screenshot: combined group device in HA device registry showing all sensors under one device -->
+
+<!-- screenshot: combined sensors visible in Developer Tools → States -->
+
+### Example Automation
+
+Alert when anything across your entire home goes offline:
+
+```yaml
+automation:
+  - alias: "Notify any device offline (whole home)"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.entity_availability_all_devices_any_offline
+        to: "on"
+    action:
+      - service: notify.mobile_app
+        data:
+          title: "Device Offline"
+          message: >
+            {{ states('sensor.entity_availability_all_devices_offline_entities') }}
+```
+
+---
+
 ## How Availability % Works
 
-Availability is calculated using 5-minute time buckets (up to 7 days / 2016 buckets):
+Availability sensors show what percentage of the time your entities were online during a given window (today, 3 days, 7 days, etc.).
 
-1. Every 30 seconds, the integration checks each entity's state
-2. If online, the time is added to the current bucket's "online seconds"
-3. If offline, the bucket exists but no online time is added
-4. For a given window (e.g., "today" = last 24 hours), availability = `total online seconds / total seconds * 100`
+The integration samples each entity's state in the background. If online, that time counts toward its availability. If offline, it doesn't.
 
-**Group availability** is the average of all non-suppressed entity availabilities.
+**Group availability** is the average of all non-suppressed entities in the group.
 
-**Example:** 3 entities monitored over 24 hours. Entity A was offline all day (0%), B and C were always online (100%). Group availability = (0 + 100 + 100) / 3 = 66.7%.
+**Example:** 3 entities monitored over 24 hours. Entity A was offline all day (0%), B and C were always online (100%). Group availability = 66.7%.
 
-> **Important:** Availability sensors will show as `unavailable` when the integration first starts. This is normal -- they need time to collect data before reporting a percentage. For "today" they need at least one 5-minute bucket; for longer windows (3d, 7d) they need at least 10% of the expected data before showing a value.
+> **Important:** Availability sensors show `unavailable` right after the integration is first installed — this is normal. They will populate as data is collected.
 
 ---
 
@@ -369,7 +423,7 @@ availability_colors:
 | `show_entities` | `true` | Show expandable entity list |
 | `entities_expanded` | `false` | Start entity list expanded |
 | `show_actions` | `false` | Show Suppress/Unsuppress buttons |
-| `entity_detail` | `"off"` | Entity detail mode: `"off"`, `"tooltip"` (hover), `"inline"` (always visible). When `compact: true` + `"inline"`, shows only HA State + last-changed duration. ISO timestamp states (e.g. `last_seen`) are auto-formatted to `Oct 15 · 14:30` |
+| `entity_detail` | `"off"` | `"off"` / `"tooltip"` (hover to see details) / `"inline"` (always show details). In compact mode with inline, shows state + last-changed time. Timestamp states are formatted as readable dates. |
 | `entity_filter` | `"all"` | Filter entity list: `"all"`, `"offline"` (problems only: offline/stale/low battery), `"online"` (healthy only). Section title and count update to reflect filter (e.g., "Offline Entities (2/6)") |
 | `compact` | `false` | Reduced padding mode |
 | `sort_by` | `status` | Entity list sort order: `status`, `name_asc`, `name_desc`, `battery_asc`, `battery_desc` |

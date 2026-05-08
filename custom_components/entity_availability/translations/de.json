@@ -2,11 +2,26 @@
   "config": {
     "step": {
       "user": {
+        "title": "Eintrag erstellen",
+        "description": "Eine Gruppe von Entitäten überwachen oder bestehende Gruppen kombinieren.",
+        "data": {
+          "entry_type": "Typ"
+        }
+      },
+      "group": {
         "title": "Entitätsgruppe erstellen",
         "description": "Erstellen Sie eine Gruppe von Entitäten zur Verfügbarkeitsüberwachung.",
         "data": {
           "group_name": "Gruppenname",
           "entities": "Zu überwachende Entitäten"
+        }
+      },
+      "combined": {
+        "title": "Kombinierte Gruppe erstellen",
+        "description": "Mehrere Gruppen zu einer Ansicht für Automationen und Dashboards zusammenführen.",
+        "data": {
+          "group_name": "Name der kombinierten Gruppe",
+          "combined_groups": "Einzuschließende Gruppen"
         }
       },
       "monitoring": {
@@ -42,10 +57,12 @@
     },
     "error": {
       "empty_group_name": "Der Gruppenname darf nicht leer sein.",
-      "no_entities": "Sie müssen mindestens eine Entität auswählen."
+      "no_entities": "Sie müssen mindestens eine Entität auswählen.",
+      "not_enough_groups_selected": "Wählen Sie mindestens zwei Gruppen zum Kombinieren aus."
     },
     "abort": {
-      "already_configured": "Eine Gruppe mit diesem Namen existiert bereits."
+      "already_configured": "Eine Gruppe mit diesem Namen existiert bereits.",
+      "not_enough_groups": "Sie benötigen mindestens zwei Gruppen, bevor Sie eine kombinierte Gruppe erstellen können."
     }
   },
   "options": {
@@ -67,6 +84,14 @@
           "staleness_threshold": "Wenn eine Entität sich für diese Anzahl von Minuten nicht geändert hat, wird sie als beeinträchtigt markiert. Auf 0 setzen zum Deaktivieren.",
           "battery_threshold": "Markiert Entitäten, deren Batterie unter diesen Prozentwert fällt. Der Zustand 'low' wird automatisch erkannt. Volt-basierte Entitäten werden nicht unterstützt.",
           "availability_windows": "Zeitfenster zur Verfolgung der Gruppenverfügbarkeit (z. B. heute, 3d, 7d)."
+        }
+      },
+      "combined_init": {
+        "title": "Kombinierte Gruppe bearbeiten",
+        "description": "Name und enthaltene Gruppen dieser kombinierten Gruppe ändern.",
+        "data": {
+          "group_name": "Name der kombinierten Gruppe",
+          "combined_groups": "Einzuschließende Gruppen"
         }
       },
       "battery_mapping": {
@@ -92,6 +117,9 @@
       "group_summary": {
         "name": "Gruppenzusammenfassung"
       },
+      "combined_summary": {
+        "name": "Kombinierte Zusammenfassung"
+      },
       "availability_today": {
         "name": "Verfügbarkeit (Heute)"
       },
@@ -108,6 +136,17 @@
     "binary_sensor": {
       "any_offline": {
         "name": "Mindestens eine offline"
+      },
+      "combined_any_offline": {
+        "name": "Mindestens eine offline"
+      }
+    }
+  },
+  "selector": {
+    "entry_type": {
+      "options": {
+        "group": "Entitäten überwachen",
+        "combined_group": "Gruppen kombinieren"
       }
     }
   }

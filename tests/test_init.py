@@ -7,12 +7,20 @@ from unittest.mock import AsyncMock, patch
 
 from homeassistant.core import HomeAssistant
 
+from pytest_homeassistant_custom_component.common import MockConfigEntry
+
 from custom_components.entity_availability import (
     PLATFORMS,
     async_setup_entry,
     async_unload_entry,
 )
-from custom_components.entity_availability.const import DOMAIN
+from custom_components.entity_availability.const import (
+    CONF_COMBINED_GROUPS,
+    CONF_ENTRY_TYPE,
+    CONF_GROUP_NAME,
+    DOMAIN,
+    ENTRY_TYPE_COMBINED,
+)
 from custom_components.entity_availability.coordinator import (
     EntityAvailabilityCoordinator,
 )
@@ -172,3 +180,70 @@ async def test_platforms_defined() -> None:
     assert Platform.SENSOR in PLATFORMS
     assert Platform.BINARY_SENSOR in PLATFORMS
     assert len(PLATFORMS) == 2
+
+
+# ---------------------------------------------------------------------------
+# Combined entry setup / unload
+# ---------------------------------------------------------------------------
+
+
+def _make_combined_entry(
+    entry_id: str, name: str, combined_ids: list[str]
+) -> MockConfigEntry:
+    return MockConfigEntry(
+        version=1,
+        domain=DOMAIN,
+        title=name,
+        data={
+            CONF_ENTRY_TYPE: ENTRY_TYPE_COMBINED,
+            CONF_GROUP_NAME: name,
+            CONF_COMBINED_GROUPS: combined_ids,
+        },
+        entry_id=entry_id,
+        unique_id=f"{DOMAIN}_combined_{name.lower().replace(' ', '_')}",
+    )
+
+
+async def test_combined_setup_does_not_store_coordinator(
+    mock_hass: HomeAssistant,
+) -> None:
+    """Combined entry setup does NOT put a coordinator into hass.data[DOMAIN]."""
+    hass = mock_hass
+    combined = _make_combined_entry("combined_id", "My Combined", [])
+    combined.add_to_hass(hass)
+
+    with patch.object(
+        hass.config_entries,
+        "async_forward_entry_setups",
+        new_callable=AsyncMock,
+    ):
+        result = await async_setup_entry(hass, combined)
+
+    assert result is True
+    # No coordinator stored under the combined entry_id
+    assert "combined_id" not in hass.data.get(DOMAIN, {})
+
+
+async def test_combined_unload_entry(mock_hass: HomeAssistant) -> None:
+    """Combined entry unloads cleanly without touching hass.data[DOMAIN]."""
+    hass = mock_hass
+    combined = _make_combined_entry("combined_id3", "My Combined", [])
+    combined.add_to_hass(hass)
+
+    with patch.object(
+        hass.config_entries,
+        "async_forward_entry_setups",
+        new_callable=AsyncMock,
+    ):
+        await async_setup_entry(hass, combined)
+
+    with patch.object(
+        hass.config_entries,
+        "async_unload_platforms",
+        new_callable=AsyncMock,
+        return_value=True,
+    ) as mock_unload:
+        result = await async_unload_entry(hass, combined)
+
+    assert result is True
+    mock_unload.assert_called_once_with(combined, PLATFORMS)

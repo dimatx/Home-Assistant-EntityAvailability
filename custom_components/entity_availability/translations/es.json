@@ -2,11 +2,26 @@
   "config": {
     "step": {
       "user": {
+        "title": "Crear entrada",
+        "description": "Supervisar un grupo de entidades o combinar grupos existentes.",
+        "data": {
+          "entry_type": "Tipo"
+        }
+      },
+      "group": {
         "title": "Crear grupo de entidades",
         "description": "Cree un grupo de entidades para supervisar su disponibilidad.",
         "data": {
           "group_name": "Nombre del grupo",
           "entities": "Entidades a supervisar"
+        }
+      },
+      "combined": {
+        "title": "Crear grupo combinado",
+        "description": "Combina varios grupos en una vista para automatizaciones y paneles.",
+        "data": {
+          "group_name": "Nombre del grupo combinado",
+          "combined_groups": "Grupos a incluir"
         }
       },
       "monitoring": {
@@ -42,10 +57,12 @@
     },
     "error": {
       "empty_group_name": "El nombre del grupo no puede estar vacío.",
-      "no_entities": "Debe seleccionar al menos una entidad."
+      "no_entities": "Debe seleccionar al menos una entidad.",
+      "not_enough_groups_selected": "Seleccione al menos dos grupos para combinar."
     },
     "abort": {
-      "already_configured": "Ya existe un grupo con este nombre."
+      "already_configured": "Ya existe un grupo con este nombre.",
+      "not_enough_groups": "Necesita al menos dos grupos antes de crear un grupo combinado."
     }
   },
   "options": {
@@ -67,6 +84,14 @@
           "staleness_threshold": "Si una entidad no ha cambiado de estado durante este número de minutos, se marca como degradada. Establezca 0 para deshabilitar.",
           "battery_threshold": "Marca entidades cuya batería cae por debajo de este porcentaje. El estado 'low' también se detecta automáticamente. Las entidades basadas en voltios no son compatibles.",
           "availability_windows": "Ventanas de tiempo para el seguimiento del historial de disponibilidad del grupo (p. ej. hoy, 3d, 7d)."
+        }
+      },
+      "combined_init": {
+        "title": "Editar grupo combinado",
+        "description": "Modificar el nombre y los grupos incluidos en este grupo combinado.",
+        "data": {
+          "group_name": "Nombre del grupo combinado",
+          "combined_groups": "Grupos a incluir"
         }
       },
       "battery_mapping": {
@@ -92,6 +117,9 @@
       "group_summary": {
         "name": "Resumen del grupo"
       },
+      "combined_summary": {
+        "name": "Resumen combinado"
+      },
       "availability_today": {
         "name": "Disponibilidad (Hoy)"
       },
@@ -108,6 +136,17 @@
     "binary_sensor": {
       "any_offline": {
         "name": "Alguno sin conexión"
+      },
+      "combined_any_offline": {
+        "name": "Alguno sin conexión"
+      }
+    }
+  },
+  "selector": {
+    "entry_type": {
+      "options": {
+        "group": "Supervisar entidades",
+        "combined_group": "Combinar grupos"
       }
     }
   }

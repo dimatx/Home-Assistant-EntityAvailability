@@ -14,7 +14,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 
-from .const import CONF_GROUP_NAME, DOMAIN
+from .const import CONF_ENTRY_TYPE, CONF_GROUP_NAME, DOMAIN, ENTRY_TYPE_COMBINED
 from .coordinator import EntityAvailabilityCoordinator
 
 
@@ -24,6 +24,12 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Entity Availability binary sensors."""
+    if entry.data.get(CONF_ENTRY_TYPE) == ENTRY_TYPE_COMBINED:
+        from .combined_binary_sensor import async_setup_entry as _combined
+
+        await _combined(hass, entry, async_add_entities)
+        return
+
     coordinator: EntityAvailabilityCoordinator = hass.data[DOMAIN][entry.entry_id]
     group_name = entry.data[CONF_GROUP_NAME]
     group_slug = group_name.lower().replace(" ", "_")

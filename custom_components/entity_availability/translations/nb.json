@@ -2,11 +2,26 @@
   "config": {
     "step": {
       "user": {
+        "title": "Opprett oppføring",
+        "description": "Overvåk en gruppe med entiteter, eller kombiner eksisterende grupper.",
+        "data": {
+          "entry_type": "Type"
+        }
+      },
+      "group": {
         "title": "Opprett entitetsgruppe",
         "description": "Opprett en gruppe med entiteter for tilgjengelighetsovervåking.",
         "data": {
           "group_name": "Gruppenavn",
           "entities": "Entiteter å overvåke"
+        }
+      },
+      "combined": {
+        "title": "Opprett kombinert gruppe",
+        "description": "Kombiner flere grupper i én visning for automatisering og dashboards.",
+        "data": {
+          "group_name": "Navn på kombinert gruppe",
+          "combined_groups": "Grupper som skal inkluderes"
         }
       },
       "monitoring": {
@@ -42,10 +57,12 @@
     },
     "error": {
       "empty_group_name": "Gruppenavnet kan ikke være tomt.",
-      "no_entities": "Du må velge minst én entitet."
+      "no_entities": "Du må velge minst én entitet.",
+      "not_enough_groups_selected": "Velg minst to grupper å kombinere."
     },
     "abort": {
-      "already_configured": "En gruppe med dette navnet finnes allerede."
+      "already_configured": "En gruppe med dette navnet finnes allerede.",
+      "not_enough_groups": "Du trenger minst to grupper før du kan opprette en kombinert gruppe."
     }
   },
   "options": {
@@ -67,6 +84,14 @@
           "staleness_threshold": "Hvis en enhet ikke har endret tilstand på dette antallet minutter, merkes den som forringet. Sett til 0 for å deaktivere.",
           "battery_threshold": "Markerer enheter hvis batteri faller under denne prosentandelen. Tilstanden 'low' oppdages også automatisk. Volt-baserte enheter støttes ikke.",
           "availability_windows": "Tidsvinduer for sporing av gruppens tilgjengelighetshistorikk (f.eks. i dag, 3d, 7d)."
+        }
+      },
+      "combined_init": {
+        "title": "Rediger kombinert gruppe",
+        "description": "Rediger navn og inkluderte grupper for denne kombinerte gruppen.",
+        "data": {
+          "group_name": "Navn på kombinert gruppe",
+          "combined_groups": "Grupper som skal inkluderes"
         }
       },
       "battery_mapping": {
@@ -92,6 +117,9 @@
       "group_summary": {
         "name": "Gruppeoppsummering"
       },
+      "combined_summary": {
+        "name": "Kombinert oppsummering"
+      },
       "availability_today": {
         "name": "Tilgjengelighet (i dag)"
       },
@@ -108,6 +136,17 @@
     "binary_sensor": {
       "any_offline": {
         "name": "Noen offline"
+      },
+      "combined_any_offline": {
+        "name": "Noen offline"
+      }
+    }
+  },
+  "selector": {
+    "entry_type": {
+      "options": {
+        "group": "Overvåk entiteter",
+        "combined_group": "Kombiner grupper"
       }
     }
   }

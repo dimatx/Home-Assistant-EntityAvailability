@@ -23,8 +23,10 @@ from .const import (
     CONF_BAD_STATES,
     CONF_BATTERY_ENTITY_MAP,
     CONF_BATTERY_THRESHOLD,
+    CONF_COMBINED_GROUPS,
     CONF_COOLDOWN,
     CONF_ENTITIES,
+    CONF_ENTRY_TYPE,
     CONF_GROUP_NAME,
     CONF_STALENESS_THRESHOLD,
     DEFAULT_AVAILABILITY_WINDOWS,
@@ -33,6 +35,8 @@ from .const import (
     DEFAULT_COOLDOWN,
     DEFAULT_STALENESS_THRESHOLD,
     DOMAIN,
+    ENTRY_TYPE_COMBINED,
+    ENTRY_TYPE_GROUP,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -50,7 +54,33 @@ class EntityAvailabilityConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Step 1: Group name and entity selection."""
+        """Step 1: Choose entry type — monitor entities or combine groups."""
+        if user_input is not None:
+            if user_input["entry_type"] == ENTRY_TYPE_COMBINED:
+                return await self.async_step_combined()
+            return await self.async_step_group()
+
+        return self.async_show_form(
+            step_id="user",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        "entry_type", default=ENTRY_TYPE_GROUP
+                    ): selector.SelectSelector(
+                        selector.SelectSelectorConfig(
+                            options=[ENTRY_TYPE_GROUP, ENTRY_TYPE_COMBINED],
+                            translation_key="entry_type",
+                            mode=selector.SelectSelectorMode.LIST,
+                        )
+                    ),
+                }
+            ),
+        )
+
+    async def async_step_group(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Step 1b: Group name and entity selection."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
@@ -67,6 +97,7 @@ class EntityAvailabilityConfigFlow(ConfigFlow, domain=DOMAIN):
                 )
                 self._abort_if_unique_id_configured()
 
+                self._data[CONF_ENTRY_TYPE] = ENTRY_TYPE_GROUP
                 self._data[CONF_GROUP_NAME] = group_name
                 self._data[CONF_ENTITIES] = entities
                 return await self.async_step_monitoring()
@@ -81,8 +112,68 @@ class EntityAvailabilityConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
         return self.async_show_form(
-            step_id="user",
+            step_id="group",
             data_schema=data_schema,
+            errors=errors,
+        )
+
+    async def async_step_combined(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Step for creating a combined group."""
+        errors: dict[str, str] = {}
+
+        existing_groups = [
+            e
+            for e in self.hass.config_entries.async_entries(DOMAIN)
+            if e.data.get(CONF_ENTRY_TYPE, ENTRY_TYPE_GROUP) == ENTRY_TYPE_GROUP
+        ]
+
+        if len(existing_groups) < 2:
+            return self.async_abort(reason="not_enough_groups")
+
+        if user_input is not None:
+            group_name = user_input[CONF_GROUP_NAME]
+            combined_groups = user_input[CONF_COMBINED_GROUPS]
+
+            if not group_name.strip():
+                errors[CONF_GROUP_NAME] = "empty_group_name"
+            elif len(combined_groups) < 2:
+                errors[CONF_COMBINED_GROUPS] = "not_enough_groups_selected"
+            else:
+                await self.async_set_unique_id(
+                    f"{DOMAIN}_combined_{group_name.lower().replace(' ', '_')}"
+                )
+                self._abort_if_unique_id_configured()
+
+                return self.async_create_entry(
+                    title=group_name,
+                    data={
+                        CONF_ENTRY_TYPE: ENTRY_TYPE_COMBINED,
+                        CONF_GROUP_NAME: group_name,
+                        CONF_COMBINED_GROUPS: combined_groups,
+                    },
+                )
+
+        group_options = [
+            selector.SelectOptionDict(value=e.entry_id, label=e.title)
+            for e in existing_groups
+        ]
+
+        return self.async_show_form(
+            step_id="combined",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_GROUP_NAME): str,
+                    vol.Required(CONF_COMBINED_GROUPS): selector.SelectSelector(
+                        selector.SelectSelectorConfig(
+                            options=group_options,
+                            multiple=True,
+                            mode=selector.SelectSelectorMode.LIST,
+                        )
+                    ),
+                }
+            ),
             errors=errors,
         )
 
@@ -228,8 +319,10 @@ class EntityAvailabilityConfigFlow(ConfigFlow, domain=DOMAIN):
     @callback
     def async_get_options_flow(
         config_entry: ConfigEntry,
-    ) -> EntityAvailabilityOptionsFlow:
+    ) -> EntityAvailabilityOptionsFlow | CombinedGroupOptionsFlow:
         """Get the options flow for this handler."""
+        if config_entry.data.get(CONF_ENTRY_TYPE) == ENTRY_TYPE_COMBINED:
+            return CombinedGroupOptionsFlow()
         return EntityAvailabilityOptionsFlow()
 
 
@@ -380,3 +473,68 @@ class EntityAvailabilityOptionsFlow(OptionsFlow):
                 return battery_entity
 
         return ""
+
+
+class CombinedGroupOptionsFlow(OptionsFlow):
+    """Handle options flow for a combined group entry."""
+
+    init_step = "combined_init"
+
+    async def async_step_combined_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Edit combined group name and included groups."""
+        errors: dict[str, str] = {}
+
+        existing_groups = [
+            e
+            for e in self.hass.config_entries.async_entries(DOMAIN)
+            if e.data.get(CONF_ENTRY_TYPE, ENTRY_TYPE_GROUP) == ENTRY_TYPE_GROUP
+        ]
+
+        if user_input is not None:
+            group_name = user_input[CONF_GROUP_NAME]
+            combined_groups = user_input[CONF_COMBINED_GROUPS]
+
+            if not group_name.strip():
+                errors[CONF_GROUP_NAME] = "empty_group_name"
+            elif len(combined_groups) < 2:
+                errors[CONF_COMBINED_GROUPS] = "not_enough_groups_selected"
+            else:
+                new_data = {
+                    **self.config_entry.data,
+                    CONF_GROUP_NAME: group_name,
+                    CONF_COMBINED_GROUPS: combined_groups,
+                }
+                self.hass.config_entries.async_update_entry(
+                    self.config_entry, title=group_name, data=new_data
+                )
+                return self.async_create_entry(title="", data={})
+
+        current = self.config_entry.data
+        group_options = [
+            selector.SelectOptionDict(value=e.entry_id, label=e.title)
+            for e in existing_groups
+        ]
+
+        return self.async_show_form(
+            step_id="combined_init",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_GROUP_NAME, default=current.get(CONF_GROUP_NAME, "")
+                    ): str,
+                    vol.Required(
+                        CONF_COMBINED_GROUPS,
+                        default=current.get(CONF_COMBINED_GROUPS, []),
+                    ): selector.SelectSelector(
+                        selector.SelectSelectorConfig(
+                            options=group_options,
+                            multiple=True,
+                            mode=selector.SelectSelectorMode.LIST,
+                        )
+                    ),
+                }
+            ),
+            errors=errors,
+        )
