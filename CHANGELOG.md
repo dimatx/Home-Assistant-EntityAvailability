@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.3.0-beta.1] - Unreleased
+## [0.3.0-beta.1] - 2026-05-08
 
 ### Added
 - Combined groups — select two or more existing groups and get a unified set of sensors that aggregate data across all of them
