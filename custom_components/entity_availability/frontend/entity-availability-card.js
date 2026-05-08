@@ -1280,17 +1280,18 @@ class EntityAvailabilityCardEditor extends LitElement {
             placeholder="Custom card title"
           />
         </div>
+        ${!this._isSelectedGroupCombined() ? html`
         <div class="editor-row checkbox">
           <label>
             <input
               type="checkbox"
               .checked=${this._config.show_availability !== false}
               @change=${(e) => this._updateConfig("show_availability", e.target.checked)}
-              ?disabled=${this._isSelectedGroupCombined()}
             />
-            Show Availability Bars${this._isSelectedGroupCombined() ? " (not available for combined groups)" : ""}
+            Show Availability Bars
           </label>
         </div>
+        ` : nothing}
         <div class="editor-row checkbox">
           <label>
             <input
@@ -1301,6 +1302,7 @@ class EntityAvailabilityCardEditor extends LitElement {
             Show Entity List
           </label>
         </div>
+        ${!this._isSelectedGroupCombined() ? html`
         <div class="editor-row">
           <label>Filter Entities (requires Show Entity List)</label>
           <select
@@ -1313,6 +1315,7 @@ class EntityAvailabilityCardEditor extends LitElement {
             <option value="online">Healthy only (online)</option>
           </select>
         </div>
+        ` : nothing}
         <div class="editor-row checkbox">
           <label>
             <input
@@ -1323,6 +1326,7 @@ class EntityAvailabilityCardEditor extends LitElement {
             Entity List Expanded by Default
           </label>
         </div>
+        ${!this._isSelectedGroupCombined() ? html`
         <div class="editor-row checkbox">
           <label>
             <input
@@ -1333,6 +1337,7 @@ class EntityAvailabilityCardEditor extends LitElement {
             Show Suppress/Unsuppress Buttons
           </label>
         </div>
+        ` : nothing}
         <div class="editor-row checkbox">
           <label>
             <input
@@ -1343,6 +1348,7 @@ class EntityAvailabilityCardEditor extends LitElement {
             Compact Mode
           </label>
         </div>
+        ${!this._isSelectedGroupCombined() ? html`
         <div class="editor-row">
           <label>Entity Detail</label>
           <select
@@ -1367,6 +1373,8 @@ class EntityAvailabilityCardEditor extends LitElement {
             <option value="battery_desc">Battery ↓ (strongest first)</option>
           </select>
         </div>
+        ` : nothing}
+        ${!this._isSelectedGroupCombined() ? html`
         <div class="threshold-section">
           <label>Availability Bar Colors & Thresholds</label>
           <div class="color-row">
@@ -1408,6 +1416,7 @@ class EntityAvailabilityCardEditor extends LitElement {
             />
           </div>
         </div>
+        ` : nothing}
       </div>
     `;
   }
