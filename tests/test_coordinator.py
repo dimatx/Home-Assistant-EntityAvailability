@@ -13,6 +13,7 @@ from homeassistant.core import HomeAssistant, State
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.entity_availability.const import (
+    CONF_BATTERY_ENTITY_MAP,
     CONF_ENTITIES,
     CONF_STALENESS_THRESHOLD,
     DEFAULT_BAD_STATES,
@@ -20,6 +21,7 @@ from custom_components.entity_availability.const import (
     DEFAULT_COOLDOWN,
     DEFAULT_STALENESS_THRESHOLD,
     DOMAIN,
+    SCAN_INTERVAL,
     STARTUP_GRACE_PERIOD,
 )
 from custom_components.entity_availability.coordinator import (
@@ -544,6 +546,140 @@ async def test_startup_grace_allows_transition_after_expiry(
     assert coord.device_states["binary_sensor.device_a"].is_offline is True
 
 
+async def test_debounce_cancel_on_rapid_state_changes(
+    mock_hass: HomeAssistant, mock_config_entry
+) -> None:
+    """Rapid state changes cancel the previous debounce timer, scheduling only one refresh."""
+    hass = mock_hass
+
+    with patch.object(
+        EntityAvailabilityCoordinator, "_async_save_storage", new_callable=AsyncMock
+    ):
+        coord = EntityAvailabilityCoordinator(hass, mock_config_entry)
+        coord._last_update = None
+        await coord._async_update_data()
+
+        cancel_calls = []
+
+        def make_cancel():
+            called = []
+
+            def cancel():
+                called.append(True)
+                cancel_calls.append(True)
+
+            return cancel, called
+
+        first_cancel, first_called = make_cancel()
+        second_cancel, _ = make_cancel()
+
+        with patch(
+            "custom_components.entity_availability.coordinator.async_call_later",
+            side_effect=[first_cancel, second_cancel],
+        ):
+            # First state change — schedules debounce, no previous cancel
+            coord._handle_state_change(MagicMock())
+            assert coord._debounce_cancel is first_cancel
+            assert len(cancel_calls) == 0
+
+            # Second rapid state change — cancels first, schedules new
+            coord._handle_state_change(MagicMock())
+            assert coord._debounce_cancel is second_cancel
+            assert len(cancel_calls) == 1  # first cancel was called
+
+
+async def test_recovery_attributes_across_multiple_cycles(
+    mock_hass: HomeAssistant, mock_config_entry
+) -> None:
+    """last_recovery and last_downtime_seconds update correctly across multiple offline/online cycles."""
+    hass = mock_hass
+    hass.states.async_set("binary_sensor.device_a", STATE_UNAVAILABLE)
+
+    with patch.object(
+        EntityAvailabilityCoordinator, "_async_save_storage", new_callable=AsyncMock
+    ):
+        coord = EntityAvailabilityCoordinator(hass, mock_config_entry)
+        coord._startup_time = datetime.now(timezone.utc) - timedelta(
+            seconds=STARTUP_GRACE_PERIOD + 10
+        )
+        coord._last_update = None
+
+        # --- Cycle 1: go offline then recover ---
+        await coord._async_update_data()
+        device_a = coord.device_states["binary_sensor.device_a"]
+        device_a.cooldown_start = datetime.now(timezone.utc) - timedelta(seconds=120)
+        await coord._async_update_data()
+        assert device_a.is_offline is True
+
+        hass.states.async_set("binary_sensor.device_a", STATE_ON)
+        await coord._async_update_data()
+        assert device_a.is_offline is False
+        first_recovery = device_a.last_recovery
+        first_downtime = device_a.last_downtime_seconds
+        assert first_recovery is not None
+        assert first_downtime is not None and first_downtime > 0
+
+        # --- Cycle 2: go offline again then recover ---
+        hass.states.async_set("binary_sensor.device_a", STATE_UNAVAILABLE)
+        await coord._async_update_data()
+        device_a.cooldown_start = datetime.now(timezone.utc) - timedelta(seconds=120)
+        await coord._async_update_data()
+        assert device_a.is_offline is True
+
+        hass.states.async_set("binary_sensor.device_a", STATE_ON)
+        await coord._async_update_data()
+        assert device_a.is_offline is False
+
+        # second recovery must be a newer timestamp than first
+        assert device_a.last_recovery is not None
+        assert device_a.last_recovery >= first_recovery
+        assert device_a.last_downtime_seconds is not None
+
+
+async def test_suppressed_entity_skips_availability_storage(
+    mock_hass: HomeAssistant, mock_config_entry
+) -> None:
+    """Suppressed entity does not record online/offline time in availability storage."""
+    hass = mock_hass
+    hass.states.async_set("binary_sensor.device_a", STATE_UNAVAILABLE)
+
+    with patch.object(
+        EntityAvailabilityCoordinator, "_async_save_storage", new_callable=AsyncMock
+    ):
+        coord = EntityAvailabilityCoordinator(hass, mock_config_entry)
+        coord._last_update = None
+        await coord._async_update_data()
+
+        coord.suppress_entity(
+            "binary_sensor.device_a",
+            datetime.now(timezone.utc) + timedelta(hours=1),
+        )
+
+        # Patch storage methods to detect if they're called for device_a
+        record_online_calls = []
+        record_offline_calls = []
+        original_online = coord._availability_storage.record_online
+        original_offline = coord._availability_storage.record_offline
+
+        def tracking_online(entity_id, *args, **kwargs):
+            if entity_id == "binary_sensor.device_a":
+                record_online_calls.append(entity_id)
+            return original_online(entity_id, *args, **kwargs)
+
+        def tracking_offline(entity_id, *args, **kwargs):
+            if entity_id == "binary_sensor.device_a":
+                record_offline_calls.append(entity_id)
+            return original_offline(entity_id, *args, **kwargs)
+
+        coord._availability_storage.record_online = tracking_online
+        coord._availability_storage.record_offline = tracking_offline
+
+        await coord._async_update_data()
+
+    assert record_online_calls == [], "suppressed entity should not record online time"
+    assert record_offline_calls == [], "suppressed entity should not record offline time"
+
+
 async def test_device_state_persistence_prevents_restart_retrigger(
     mock_hass: HomeAssistant, mock_config_entry
 ) -> None:
@@ -578,3 +714,149 @@ async def test_device_state_persistence_prevents_restart_retrigger(
     assert device_a.is_offline is True
     # offline_since preserved from storage, not reset
     assert device_a.offline_since == offline_since
+
+
+async def test_elapsed_capped_after_long_gap(
+    mock_hass: HomeAssistant, mock_config_entry
+) -> None:
+    """Elapsed time is capped at SCAN_INTERVAL*2 to prevent availability gaps after HA sleep."""
+    hass = mock_hass
+
+    with patch.object(
+        EntityAvailabilityCoordinator, "_async_save_storage", new_callable=AsyncMock
+    ):
+        coord = EntityAvailabilityCoordinator(hass, mock_config_entry)
+        # Simulate 10-minute gap (e.g. after HA restart or sleep)
+        coord._last_update = datetime.now(timezone.utc) - timedelta(minutes=10)
+
+        recorded_seconds = []
+        original = coord._availability_storage.record_online
+
+        def capturing_record_online(entity_id, seconds, now):
+            recorded_seconds.append(seconds)
+            return original(entity_id, seconds, now)
+
+        coord._availability_storage.record_online = capturing_record_online
+
+        await coord._async_update_data()
+
+    assert recorded_seconds, "record_online should have been called"
+    assert all(s <= SCAN_INTERVAL * 2 for s in recorded_seconds), (
+        f"elapsed not capped: {recorded_seconds}"
+    )
+
+
+async def test_offline_since_equals_cooldown_start(
+    mock_hass: HomeAssistant, mock_config_entry
+) -> None:
+    """offline_since is set to cooldown_start (first detection), not now (transition time)."""
+    hass = mock_hass
+    hass.states.async_set("binary_sensor.device_a", STATE_UNAVAILABLE)
+
+    with patch.object(
+        EntityAvailabilityCoordinator, "_async_save_storage", new_callable=AsyncMock
+    ):
+        coord = EntityAvailabilityCoordinator(hass, mock_config_entry)
+        coord._startup_time = datetime.now(timezone.utc) - timedelta(
+            seconds=STARTUP_GRACE_PERIOD + 10
+        )
+        coord._last_update = None
+
+        await coord._async_update_data()
+        device_a = coord.device_states["binary_sensor.device_a"]
+
+        backdate = datetime.now(timezone.utc) - timedelta(seconds=DEFAULT_COOLDOWN + 10)
+        device_a.cooldown_start = backdate
+
+        await coord._async_update_data()
+
+    assert device_a.is_offline is True
+    assert device_a.offline_since == backdate, (
+        "offline_since must equal cooldown_start, not now"
+    )
+
+
+async def test_periodic_save_triggers_after_10_updates(
+    mock_hass: HomeAssistant, mock_config_entry
+) -> None:
+    """Storage is saved every _SAVE_INTERVAL_UPDATES (10) update cycles."""
+    hass = mock_hass
+
+    save_calls = []
+
+    async def counting_save(self_inner=None):
+        save_calls.append(True)
+
+    with patch.object(
+        EntityAvailabilityCoordinator,
+        "_async_save_storage",
+        new=counting_save,
+    ):
+        coord = EntityAvailabilityCoordinator(hass, mock_config_entry)
+        coord._last_update = None
+
+        # Run 9 updates — should not save yet
+        for _ in range(9):
+            await coord._async_update_data()
+        assert len(save_calls) == 0, "save should not fire before 10 updates"
+
+        # 10th update — should trigger save and reset counter
+        await coord._async_update_data()
+        assert len(save_calls) == 1, "save should fire on 10th update"
+        assert coord._update_count == 0, "_update_count should reset after save"
+
+
+async def test_shutdown_save_only_when_dirty(
+    mock_hass: HomeAssistant, mock_config_entry
+) -> None:
+    """async_shutdown saves storage only when dirty flag is set."""
+    hass = mock_hass
+
+    with patch.object(
+        EntityAvailabilityCoordinator, "_async_save_storage", new_callable=AsyncMock
+    ) as mock_save:
+        coord = EntityAvailabilityCoordinator(hass, mock_config_entry)
+
+        # Not dirty — shutdown should not save
+        coord._dirty = False
+        await coord.async_shutdown()
+        mock_save.assert_not_called()
+
+        # Dirty — shutdown should save
+        coord._dirty = True
+        await coord.async_shutdown()
+        mock_save.assert_called_once()
+
+
+async def test_battery_map_falsy_returns_none(
+    mock_hass: HomeAssistant, mock_config_data
+) -> None:
+    """Battery map entry of None or empty string returns None (entity skipped)."""
+    hass = mock_hass
+    hass.states.async_set("binary_sensor.device_a", STATE_ON)
+
+    for falsy_value in [None, ""]:
+        config = dict(mock_config_data)
+        config[CONF_BATTERY_ENTITY_MAP] = {"binary_sensor.device_a": falsy_value}
+
+        entry = MockConfigEntry(
+            version=1,
+            domain=DOMAIN,
+            title="Test Group",
+            data=config,
+            entry_id=f"test_entry_falsy_{falsy_value}",
+            unique_id=f"{DOMAIN}_test_falsy_{falsy_value}",
+        )
+
+        with patch.object(
+            EntityAvailabilityCoordinator, "_async_save_storage", new_callable=AsyncMock
+        ):
+            coord = EntityAvailabilityCoordinator(hass, entry)
+            coord._last_update = None
+            await coord._async_update_data()
+
+        device_a = coord.device_states["binary_sensor.device_a"]
+        assert device_a.battery_level is None, (
+            f"falsy map value {falsy_value!r} should produce battery_level=None"
+        )
+

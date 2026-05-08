@@ -425,6 +425,43 @@ automation:
             Currently offline: {{ states('sensor.entity_availability_security_devices_offline_count') }}
 ```
 
+### Persistent notification with auto-clear
+
+Show a persistent notification when devices are offline and automatically dismiss it when all devices come back online:
+
+```yaml
+automation:
+  - alias: "Persistent offline notification"
+    trigger:
+      - platform: state
+        entity_id: sensor.entity_availability_all_devices_offline_count
+    condition:
+      - condition: template
+        value_template: "{{ trigger.from_state.state != trigger.to_state.state }}"
+    action:
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ trigger.to_state.state | int(0) > 0 }}"
+            sequence:
+              - service: persistent_notification.create
+                data:
+                  notification_id: entity_availability_offline
+                  title: "Devices Offline"
+                  message: >
+                    {{ trigger.to_state.state }} device(s) offline:
+                    {{ states('sensor.entity_availability_all_devices_offline_entities') }}
+          - conditions:
+              - condition: template
+                value_template: "{{ trigger.to_state.state | int(0) == 0 }}"
+            sequence:
+              - service: persistent_notification.dismiss
+                data:
+                  notification_id: entity_availability_offline
+```
+
+Using a fixed `notification_id` ensures the same notification is updated (not duplicated) each time the count changes, and is automatically dismissed when everything comes back online.
+
 ---
 
 ## Custom Lovelace Card
