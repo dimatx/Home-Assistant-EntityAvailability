@@ -2,11 +2,26 @@
   "config": {
     "step": {
       "user": {
+        "title": "Opret post",
+        "description": "Overvåg en gruppe af entiteter, eller kombiner eksisterende grupper.",
+        "data": {
+          "entry_type": "Type"
+        }
+      },
+      "group": {
         "title": "Opret entitetsgruppe",
         "description": "Opret en gruppe af entiteter til overvågning af tilgængelighed.",
         "data": {
           "group_name": "Gruppenavn",
           "entities": "Entiteter at overvåge"
+        }
+      },
+      "combined": {
+        "title": "Opret kombineret gruppe",
+        "description": "Kombiner flere grupper i én visning til automationer og dashboards.",
+        "data": {
+          "group_name": "Kombineret gruppenavn",
+          "combined_groups": "Grupper der skal inkluderes"
         }
       },
       "monitoring": {
@@ -42,10 +57,12 @@
     },
     "error": {
       "empty_group_name": "Gruppenavnet kan ikke være tomt.",
-      "no_entities": "Du skal vælge mindst én entitet."
+      "no_entities": "Du skal vælge mindst én entitet.",
+      "not_enough_groups_selected": "Vælg mindst to grupper at kombinere."
     },
     "abort": {
-      "already_configured": "En gruppe med dette navn findes allerede."
+      "already_configured": "En gruppe med dette navn findes allerede.",
+      "not_enough_groups": "Du skal have mindst to grupper, før du opretter en kombineret gruppe."
     }
   },
   "options": {
@@ -67,6 +84,14 @@
           "staleness_threshold": "Hvis en entitet ikke har skiftet tilstand i dette antal minutter, markeres den som forringet. Sæt til 0 for at deaktivere.",
           "battery_threshold": "Markér entiteter, hvis batteri falder under denne procentdel. Tilstanden 'low' registreres også automatisk. Volt-baserede entiteter understøttes ikke.",
           "availability_windows": "Tidsvinduer til sporing af gruppens tilgængelighed (f.eks. i dag, 3d, 7d)."
+        }
+      },
+      "combined_init": {
+        "title": "Rediger kombineret gruppe",
+        "description": "Rediger navn og inkluderede grupper for denne kombinerede gruppe.",
+        "data": {
+          "group_name": "Kombineret gruppenavn",
+          "combined_groups": "Grupper der skal inkluderes"
         }
       },
       "battery_mapping": {
@@ -92,6 +117,9 @@
       "group_summary": {
         "name": "Gruppeoversigt"
       },
+      "combined_summary": {
+        "name": "Kombineret oversigt"
+      },
       "availability_today": {
         "name": "Tilgængelighed (i dag)"
       },
@@ -108,6 +136,17 @@
     "binary_sensor": {
       "any_offline": {
         "name": "Nogen offline"
+      },
+      "combined_any_offline": {
+        "name": "Nogen offline"
+      }
+    }
+  },
+  "selector": {
+    "entry_type": {
+      "options": {
+        "group": "Overvåg entiteter",
+        "combined_group": "Kombiner grupper"
       }
     }
   }

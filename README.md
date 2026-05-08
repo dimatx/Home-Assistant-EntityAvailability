@@ -13,6 +13,7 @@ Monitor entity availability in Home Assistant. Track offline entities, availabil
 ## Features
 
 - **Multi-group support** -- organize entities by function (Security, Climate, Media, etc.)
+- **Combined groups** -- merge multiple groups into a single aggregate sensor set for cross-group automations (offline count, low battery, any-offline binary sensor)
 - **Configurable bad states** -- define which states count as offline (`unavailable`, `unknown`, or custom)
 - **Cooldown timer** -- ignore brief blips before marking an entity offline
 - **Availability % sensors** -- track uptime over today, 3-day, 5-day, and 7-day windows
@@ -47,16 +48,27 @@ Monitor entity availability in Home Assistant. Track offline entities, availabil
 
 This integration uses a config flow accessible from **Settings > Devices & Services > Add Integration > Entity Availability**.
 
-### Step 1: Create Entity Group
+### Step 1: Choose Entry Type
+
+Choose whether to monitor a group of entities or combine existing groups.
+
+| Option | Description |
+|--------|-------------|
+| Monitor entities | Create a new group of entities to monitor |
+| Combine groups | Aggregate two or more existing groups into one (requires at least 2 groups already created) |
+
+![Step 1: Choose Entry Type](custom_components/entity_availability/docs/00_create_entity.png)
+
+### Step 2a: Create Entity Group (Monitor entities path)
 
 | Field | Description |
 |-------|-------------|
 | Group Name | A descriptive name for this group (e.g., "Security Cameras") |
 | Entities to Monitor | Select the entities you want to track |
 
-![Step 1: Create Entity Group](custom_components/entity_availability/docs/01_create_entity_group.png)
+![Step 2a: Create Entity Group](custom_components/entity_availability/docs/01_create_entity_group.png)
 
-### Step 2: Monitoring Settings
+### Step 3: Monitoring Settings
 
 | Field | Default | Description |
 |-------|---------|-------------|
@@ -64,18 +76,18 @@ This integration uses a config flow accessible from **Settings > Devices & Servi
 | Cooldown (seconds) | `60` | Time to wait before confirming an entity is offline |
 | Staleness threshold (minutes) | `0` (disabled) | Mark entity degraded if no state change in this time |
 
-![Step 2: Monitoring Settings](custom_components/entity_availability/docs/02_monitoring_settings.png)
+![Step 3: Monitoring Settings](custom_components/entity_availability/docs/02_monitoring_settings.png)
 
-### Step 3: Advanced Settings
+### Step 4: Advanced Settings
 
 | Field | Default | Description |
 |-------|---------|-------------|
 | Low battery threshold (%) | `20` | Battery level below which an entity is considered degraded (0 = disabled) |
 | Availability tracking windows | `today`, `7d` | Which time windows to create availability sensors for |
 
-![Step 3: Advanced Settings](custom_components/entity_availability/docs/03_advanced_settings.png)
+![Step 4: Advanced Settings](custom_components/entity_availability/docs/03_advanced_settings.png)
 
-### Step 4: Battery Entity Mapping (when battery threshold > 0)
+### Step 5: Battery Entity Mapping (when battery threshold > 0)
 
 If you enable battery monitoring, a confirmation step appears showing each monitored entity with its auto-detected battery sensor. You can:
 
@@ -83,13 +95,22 @@ If you enable battery monitoring, a confirmation step appears showing each monit
 - **Override** with a different battery sensor
 - **Leave empty** for entities that don't have batteries (e.g., smart plugs, cloud services)
 
-Auto-detection strategies:
-1. Device registry -- finds battery sensors on the same HA device
-2. Convention -- checks for `sensor.{entity_name}_battery`
+Auto-detection checks battery sensors linked to the same device in Home Assistant, or sensors named `sensor.{entity_name}_battery`.
 
 Battery sensors that report `low` (text) are supported in addition to numeric percentages.
 
-![Step 4: Battery Entity Mapping](custom_components/entity_availability/docs/04_battery_entity_mapping.png)
+![Step 5: Battery Entity Mapping](custom_components/entity_availability/docs/04_battery_entity_mapping.png)
+
+### Step 2b: Create Combined Group (Combine groups path)
+
+| Field | Description |
+|-------|-------------|
+| Combined Group Name | A descriptive name (e.g., "All Devices") |
+| Groups to Include | Select two or more existing Entity Availability groups |
+
+No further steps — combined groups read live from their source groups and require no additional configuration.
+
+![Step 2b: Create Combined Group](custom_components/entity_availability/docs/01b_create_combined_group.png)
 
 ### Options Flow
 
@@ -132,9 +153,9 @@ The Group Summary sensor provides a complete overview in its attributes:
 | `low_battery` | Number of entities with battery below threshold |
 | `entities` | List of all monitored entity IDs in this group |
 | `battery_levels` | Dict of `{entity_id: battery_level}` for entities with battery sensors |
-| `suppressed_until` | Dict of `{entity_id: ISO datetime}` for entities with a timed suppression |
-| `stale_entities` | List of entity IDs currently considered stale (no state change beyond threshold) |
-| `offline_since` | Dict of `{entity_id: ISO datetime}` recording when each offline entity went offline |
+| `suppressed_until` | Which entities are suppressed and when the suppression expires |
+| `stale_entities` | Entities that haven't reported a state change longer than the staleness threshold |
+| `offline_since` | When each currently offline entity first went offline |
 
 Access these in templates:
 
@@ -154,20 +175,64 @@ When an entity comes back online, the `offline_count` sensor includes:
 
 ---
 
+## Combined Groups
+
+A combined group aggregates two or more monitored groups into a single set of sensors. Useful for cross-group automations — alert when anything across your entire home is offline without duplicating entity logic.
+
+See [Step 2b in the Configuration section](#step-2b-create-combined-group-combine-groups-path) for setup instructions.
+
+### Sensors Created
+
+All entity IDs use the prefix `entity_availability_` followed by the combined group slug.
+
+For example, a combined group named "All Devices" produces the slug `all_devices`:
+
+| Entity | Type | State | Notes |
+|--------|------|-------|-------|
+| `sensor..._combined_summary` | Sensor | Total offline count across all source groups | Attributes: `total_entities`, `online`, `offline`, `stale`, `low_battery`, `suppressed`, `groups`, `offline_entities`, `low_battery_entities` |
+| `sensor..._offline_entities` | Sensor | Comma-separated names of offline entities (`"None"` when all online) | Attributes: `entities` (list of entity IDs), `count` |
+| `sensor..._low_battery` | Sensor | Comma-separated names of low battery entities (`"None"` when all OK) | Attributes: `devices` (dict of entity ID → battery level), `count` |
+| `sensor..._low_battery_count` | Sensor | Number of entities with low battery across all groups | — |
+| `binary_sensor..._any_offline` | Binary Sensor (Problem) | ON when any entity across all groups is offline | Attributes: `offline_entities`, `offline_count` |
+
+Suppressed entities are excluded from all combined sensor states, consistent with per-group behaviour.
+
+![Combined Group Sensors](custom_components/entity_availability/docs/05b_combined_sensors.png)
+
+<!-- screenshot: combined sensors visible in Developer Tools → States -->
+
+### Example Automation
+
+Alert when anything across your entire home goes offline:
+
+```yaml
+automation:
+  - alias: "Notify any device offline (whole home)"
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.entity_availability_all_devices_any_offline
+        to: "on"
+    action:
+      - service: notify.mobile_app
+        data:
+          title: "Device Offline"
+          message: >
+            {{ states('sensor.entity_availability_all_devices_offline_entities') }}
+```
+
+---
+
 ## How Availability % Works
 
-Availability is calculated using 5-minute time buckets (up to 7 days / 2016 buckets):
+Availability sensors show what percentage of the time your entities were online during a given window (today, 3 days, 7 days, etc.).
 
-1. Every 30 seconds, the integration checks each entity's state
-2. If online, the time is added to the current bucket's "online seconds"
-3. If offline, the bucket exists but no online time is added
-4. For a given window (e.g., "today" = last 24 hours), availability = `total online seconds / total seconds * 100`
+The integration samples each entity's state in the background. If online, that time counts toward its availability. If offline, it doesn't.
 
-**Group availability** is the average of all non-suppressed entity availabilities.
+**Group availability** is the average of all non-suppressed entities in the group.
 
-**Example:** 3 entities monitored over 24 hours. Entity A was offline all day (0%), B and C were always online (100%). Group availability = (0 + 100 + 100) / 3 = 66.7%.
+**Example:** 3 entities monitored over 24 hours. Entity A was offline all day (0%), B and C were always online (100%). Group availability = 66.7%.
 
-> **Important:** Availability sensors will show as `unavailable` when the integration first starts. This is normal -- they need time to collect data before reporting a percentage. For "today" they need at least one 5-minute bucket; for longer windows (3d, 7d) they need at least 10% of the expected data before showing a value.
+> **Important:** Availability sensors show `unavailable` right after the integration is first installed — this is normal. They will populate as data is collected.
 
 ---
 
@@ -333,6 +398,8 @@ automation:
 
 The integration ships with a custom card for quick health visualization. It is automatically registered as a Lovelace resource when the integration loads.
 
+The card works with both regular groups and combined groups. It auto-detects the group type and adjusts its layout accordingly.
+
 ### Manual Installation (if auto-registration fails)
 
 1. Add the resource in **Settings > Dashboards > Resources**:
@@ -363,28 +430,39 @@ availability_colors:
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `group` | (required) | Group slug (e.g., `security_devices`) |
+| `group` | (required) | Group slug (e.g., `security_devices`) — works for both regular and combined groups |
 | `title` | (auto from group) | Custom card title |
-| `show_availability` | `true` | Show availability progress bars |
-| `show_entities` | `true` | Show expandable entity list |
-| `entities_expanded` | `false` | Start entity list expanded |
-| `show_actions` | `false` | Show Suppress/Unsuppress buttons |
-| `entity_detail` | `"off"` | Entity detail mode: `"off"`, `"tooltip"` (hover), `"inline"` (always visible). When `compact: true` + `"inline"`, shows only HA State + last-changed duration. ISO timestamp states (e.g. `last_seen`) are auto-formatted to `Oct 15 · 14:30` |
-| `entity_filter` | `"all"` | Filter entity list: `"all"`, `"offline"` (problems only: offline/stale/low battery), `"online"` (healthy only). Section title and count update to reflect filter (e.g., "Offline Entities (2/6)") |
+| `show_availability` | `true` | Show availability progress bars (regular groups only) |
+| `show_entities` | `true` | Show expandable entity list (regular) or group breakdown table (combined) |
+| `entities_expanded` | `false` | Start entity list / group breakdown expanded |
+| `show_actions` | `false` | Show Suppress/Unsuppress buttons (regular groups only) |
+| `entity_detail` | `"off"` | `"off"` / `"tooltip"` (hover to see details) / `"inline"` (always show details). In compact mode with inline, shows state + last-changed time. Timestamp states are formatted as readable dates. (regular groups only) |
+| `entity_filter` | `"all"` | Filter entity list: `"all"`, `"offline"` (problems only: offline/stale/low battery), `"online"` (healthy only). Section title and count update to reflect filter (e.g., "Offline Entities (2/6)"). (regular groups only) |
 | `compact` | `false` | Reduced padding mode |
-| `sort_by` | `status` | Entity list sort order: `status`, `name_asc`, `name_desc`, `battery_asc`, `battery_desc` |
-| `availability_thresholds` | `{high: 99, mid: 95}` | % thresholds for bar colors |
-| `availability_colors` | `{high, mid, low}` | Custom hex colors for bars |
+| `sort_by` | `status` | Entity list sort order: `status`, `name_asc`, `name_desc`, `battery_asc`, `battery_desc` (regular groups only) |
+| `availability_thresholds` | `{high: 99, mid: 95}` | % thresholds for bar colors (regular groups only) |
+| `availability_colors` | `{high, mid, low}` | Custom hex colors for bars (regular groups only) |
 
 > **Migration:** `show_entity_tooltips: true` from previous versions is automatically treated as `entity_detail: "tooltip"` — no manual update needed.
 
-The `group` field should be the group slug (e.g., `security_devices`). The card uses the prefix `entity_availability_` + group slug to locate all related entities automatically.
+The `group` field accepts any group slug. The card uses the prefix `entity_availability_` + group slug to locate all related entities and detect the group type automatically.
 
-All options are configurable via the visual card editor UI.
+All options are configurable via the visual card editor UI. Options that do not apply to the selected group type are hidden automatically in the editor.
 
-![Card Configuration](custom_components/entity_availability/docs/07_ui_card_configuration_screen.png)
+![Card Configuration — Regular Group](custom_components/entity_availability/docs/07_ui_card_configuration_screen.png)
 
-### Card Preview
+![Card Configuration — Combined Group](custom_components/entity_availability/docs/07b_ui_card_configuration_combined.png)
+
+### Visual Editor
+
+The card editor includes a **Group Slug** dropdown populated from all discovered groups, split into two sections:
+
+- **Groups** — regular monitored groups
+- **Combined Groups** — aggregated combined groups
+
+Selecting a combined group hides editor controls that don't apply (availability bars, entity filter, entity detail, sort order, suppress buttons, color thresholds), leaving only the options relevant to combined group display.
+
+### Card Preview — Regular Group
 
 ```
 ┌───────────────────────────────────────────────┐
@@ -408,6 +486,25 @@ All options are configurable via the visual card editor UI.
 │       [Suppress All]   [Unsuppress All]       │
 └───────────────────────────────────────────────┘
 ```
+
+### Card Preview — Combined Group
+
+```
+┌───────────────────────────────────────────────┐
+│ ✖ All Devices                      2 Offline  │
+├───────────────────────────────────────────────┤
+│   Online: 11  Offline: 2   Low Battery: 1     │
+├───────────────────────────────────────────────┤
+│  ▾ Groups (3)                                 │
+│    Group              Online  Offline  Bat.   │
+│    ─────────────────────────────────────────  │
+│    Security Devices       4        1     1    │
+│    Climate Devices        5        1     0    │
+│    Media Devices          2        0     0    │
+└───────────────────────────────────────────────┘
+```
+
+![Card — Combined Group](custom_components/entity_availability/docs/11_card_combined_group.png)
 
 ---
 

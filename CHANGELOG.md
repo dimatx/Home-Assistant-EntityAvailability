@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0-beta.1] - 2026-05-08
+
+### Added
+- Combined groups — select two or more existing groups and get a unified set of sensors that aggregate data across all of them
+- Combined group sensors: offline count, offline entities list, low battery list, low battery count
+- Binary sensor `any_offline` — turns ON when any entity in any included group is offline
+- Card: combined groups now supported — card auto-detects group type and adapts its layout
+- Card: combined group view shows per-group breakdown table (online / offline / low battery per group)
+- Card editor: Group Slug field replaced with a dropdown populated from discovered groups; regular and combined groups shown in separate optgroups
+- Card editor: controls that don't apply to combined groups (availability bars, filters, sort, entity detail, suppress buttons, color thresholds) are hidden automatically when a combined group is selected
+
+### Fixed
+- Automations no longer fire on HA restart for devices that were already offline before the restart
+- Random false-positive triggers during HA startup (devices briefly appearing offline while HA loads) are now suppressed for the first 60 seconds after startup
+- Suppress/unsuppress services are no longer unloaded while a combined group entry is still loaded
+
 ## [0.2.0] - 2026-05-07
 
 ### Added

@@ -2,11 +2,26 @@
   "config": {
     "step": {
       "user": {
+        "title": "Skapa post",
+        "description": "Övervaka en grupp entiteter eller kombinera befintliga grupper.",
+        "data": {
+          "entry_type": "Typ"
+        }
+      },
+      "group": {
         "title": "Skapa entitetsgrupp",
         "description": "Skapa en grupp av entiteter att övervaka tillgänglighet för.",
         "data": {
           "group_name": "Gruppnamn",
           "entities": "Entiteter att övervaka"
+        }
+      },
+      "combined": {
+        "title": "Skapa kombinerad grupp",
+        "description": "Kombinera flera grupper i en vy för automatiseringar och dashboards.",
+        "data": {
+          "group_name": "Namn på kombinerad grupp",
+          "combined_groups": "Grupper att inkludera"
         }
       },
       "monitoring": {
@@ -42,10 +57,12 @@
     },
     "error": {
       "empty_group_name": "Gruppnamnet kan inte vara tomt.",
-      "no_entities": "Du måste välja minst en entitet."
+      "no_entities": "Du måste välja minst en entitet.",
+      "not_enough_groups_selected": "Välj minst två grupper att kombinera."
     },
     "abort": {
-      "already_configured": "En grupp med detta namn finns redan."
+      "already_configured": "En grupp med detta namn finns redan.",
+      "not_enough_groups": "Du behöver minst två grupper innan du skapar en kombinerad grupp."
     }
   },
   "options": {
@@ -67,6 +84,14 @@
           "staleness_threshold": "Om en entitet inte har ändrat tillstånd på detta antal minuter markeras den som försämrad. Ställ in 0 för att inaktivera.",
           "battery_threshold": "Flaggar entiteter vars batteri sjunker under denna procentsats. Tillståndet 'low' identifieras också automatiskt. Volt-baserade entiteter stöds inte.",
           "availability_windows": "Tidsfönster för spårning av gruppens tillgänglighetshistorik (t.ex. idag, 3d, 7d)."
+        }
+      },
+      "combined_init": {
+        "title": "Redigera kombinerad grupp",
+        "description": "Ändra namn och inkluderade grupper för denna kombinerade grupp.",
+        "data": {
+          "group_name": "Namn på kombinerad grupp",
+          "combined_groups": "Grupper att inkludera"
         }
       },
       "battery_mapping": {
@@ -92,6 +117,9 @@
       "group_summary": {
         "name": "Gruppsammanfattning"
       },
+      "combined_summary": {
+        "name": "Kombinerad sammanfattning"
+      },
       "availability_today": {
         "name": "Tillgänglighet (idag)"
       },
@@ -108,6 +136,17 @@
     "binary_sensor": {
       "any_offline": {
         "name": "Någon offline"
+      },
+      "combined_any_offline": {
+        "name": "Någon offline"
+      }
+    }
+  },
+  "selector": {
+    "entry_type": {
+      "options": {
+        "group": "Övervaka entiteter",
+        "combined_group": "Kombinera grupper"
       }
     }
   }

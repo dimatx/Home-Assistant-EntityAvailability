@@ -8,12 +8,12 @@ from pathlib import Path
 
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.components.lovelace.resources import ResourceStorageCollection
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv
 
-from .const import DOMAIN
+from .const import DOMAIN, CONF_ENTRY_TYPE, ENTRY_TYPE_COMBINED, ENTRY_TYPE_GROUP
 from .coordinator import EntityAvailabilityCoordinator
 from .services import async_setup_services, async_unload_services
 
@@ -42,11 +42,18 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Entity Availability from a config entry."""
+    hass.data.setdefault(DOMAIN, {})
+
+    if entry.data.get(CONF_ENTRY_TYPE) == ENTRY_TYPE_COMBINED:
+        await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+        entry.async_on_unload(entry.add_update_listener(_async_update_options))
+        await _async_install_card(hass)
+        return True
+
     coordinator = EntityAvailabilityCoordinator(hass, entry)
 
     await coordinator.async_config_entry_first_refresh()
 
-    hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = coordinator
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -141,10 +148,17 @@ async def _async_register_lovelace_resource(hass: HomeAssistant, version: str) -
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
-        hass.data[DOMAIN].pop(entry.entry_id)
+    if entry.data.get(CONF_ENTRY_TYPE) == ENTRY_TYPE_COMBINED:
+        return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
-    if not hass.data.get(DOMAIN):
+    if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
+        hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
+
+    if not any(
+        e.data.get(CONF_ENTRY_TYPE, ENTRY_TYPE_GROUP) == ENTRY_TYPE_GROUP
+        for e in hass.config_entries.async_entries(DOMAIN)
+        if e.state is ConfigEntryState.LOADED
+    ):
         async_unload_services(hass)
 
     return unload_ok

@@ -260,6 +260,60 @@ const cardStyles = css`
     opacity: 1;
   }
 
+  /* Combined group breakdown */
+  .group-breakdown {
+    padding: 0 16px 12px;
+    overflow: hidden;
+    transition: max-height 0.3s ease, opacity 0.3s ease;
+  }
+
+  .group-breakdown.collapsed {
+    max-height: 0;
+    opacity: 0;
+    padding: 0 16px;
+  }
+
+  .group-breakdown.expanded {
+    max-height: 2000px;
+    opacity: 1;
+  }
+
+  .group-breakdown-row {
+    display: grid;
+    grid-template-columns: 1fr repeat(3, 56px);
+    align-items: center;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--eac-divider);
+    font-size: 13px;
+  }
+
+  .group-breakdown-row:last-child {
+    border-bottom: none;
+  }
+
+  .group-breakdown-header {
+    font-weight: 500;
+    color: var(--eac-text-secondary);
+    font-size: 12px;
+  }
+
+  .group-breakdown-name {
+    color: var(--eac-text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding-right: 8px;
+  }
+
+  .group-breakdown-count {
+    text-align: center;
+    font-weight: 500;
+  }
+
+  .group-breakdown-count.online { color: var(--eac-green); }
+  .group-breakdown-count.offline { color: var(--eac-red); }
+  .group-breakdown-count.battery { color: var(--eac-yellow); }
+
   .entity-legend {
     display: flex;
     align-items: center;
@@ -534,6 +588,43 @@ class EntityAvailabilityCard extends LitElement {
       return html`<ha-card><div class="error-message">No group configured.</div></ha-card>`;
     }
 
+    const isCombined = this._isCombinedGroup();
+
+    if (isCombined) {
+      const prefix = `entity_availability_combined_${this._config.group}`;
+      const summary = this._getEntity(`sensor.${prefix}_combined_summary`);
+      if (!summary) {
+        return html`<ha-card>
+          <div class="error-message">
+            No entities found for combined group "${this._config.group}".
+            Expected: sensor.${prefix}_combined_summary
+          </div>
+        </ha-card>`;
+      }
+      const attrs = summary.attributes || {};
+      const total = attrs.total_entities || 0;
+      const online = attrs.online || 0;
+      const offline = attrs.offline || 0;
+      const lowBattery = attrs.low_battery || 0;
+      const suppressed = attrs.suppressed || 0;
+      const groups = attrs.groups || {};
+
+      const statusColor = offline > 0 ? "red" : lowBattery > 0 ? "yellow" : "green";
+      const title = this._config.title || this._formatGroupName(this._config.group);
+      const compactClass = this._config.compact ? "compact" : "";
+      const statusText = offline > 0 ? `${offline} Offline` : lowBattery > 0 ? "Degraded" : "All OK";
+
+      return html`
+        <ha-card class="${compactClass}">
+          ${this._renderHeader(title, statusColor, statusText)}
+          <div class="divider"></div>
+          ${this._renderStats(online, offline, lowBattery, suppressed)}
+          ${suppressed > 0 ? html`<div class="suppressed-banner">${suppressed} entity${suppressed > 1 ? "ies" : ""} suppressed</div>` : nothing}
+          ${this._config.show_entities ? this._renderCombinedGroupBreakdown(groups) : nothing}
+        </ha-card>
+      `;
+    }
+
     const prefix = `entity_availability_${this._config.group}`;
     const summary = this._getEntity(`sensor.${prefix}_group_summary`);
     const offlineCountEntity = this._getEntity(`sensor.${prefix}_offline_count`);
@@ -698,6 +789,37 @@ class EntityAvailabilityCard extends LitElement {
             </div>
           `
         )}
+      </div>
+    `;
+  }
+
+  _renderCombinedGroupBreakdown(groups) {
+    const entries = Object.entries(groups);
+    if (entries.length === 0) return nothing;
+
+    const expanded = this._entitiesExpanded;
+
+    return html`
+      <div class="divider"></div>
+      <div class="entity-section-header" @click=${this._toggleEntities}>
+        <span class="entity-section-title">Groups (${entries.length})</span>
+        <ha-icon class="chevron ${expanded ? "expanded" : ""}" icon="mdi:chevron-down"></ha-icon>
+      </div>
+      <div class="group-breakdown ${expanded ? "expanded" : "collapsed"}">
+        <div class="group-breakdown-row group-breakdown-header">
+          <span>Group</span>
+          <span style="text-align:center">Online</span>
+          <span style="text-align:center">Offline</span>
+          <span style="text-align:center">Bat.</span>
+        </div>
+        ${entries.map(([name, g]) => html`
+          <div class="group-breakdown-row">
+            <span class="group-breakdown-name">${name}</span>
+            <span class="group-breakdown-count online">${g.online ?? 0}</span>
+            <span class="group-breakdown-count ${g.offline > 0 ? "offline" : "neutral"}">${g.offline ?? 0}</span>
+            <span class="group-breakdown-count ${g.low_battery > 0 ? "battery" : "neutral"}">${g.low_battery ?? 0}</span>
+          </div>
+        `)}
       </div>
     `;
   }
@@ -869,8 +991,25 @@ class EntityAvailabilityCard extends LitElement {
     return this.hass?.states?.[entityId];
   }
 
+  _isCombinedGroup() {
+    if (!this.hass || !this._config.group) return false;
+    const slug = this._config.group;
+    return !!this.hass.states[`sensor.entity_availability_combined_${slug}_combined_summary`];
+  }
+
   _getAllEntityIds() {
-    const prefix = `entity_availability_${this._config.group}`;
+    const group = this._config.group;
+    if (this._isCombinedGroup()) {
+      const prefix = `entity_availability_combined_${group}`;
+      return [
+        `sensor.${prefix}_combined_summary`,
+        `sensor.${prefix}_offline_entities`,
+        `sensor.${prefix}_low_battery`,
+        `sensor.${prefix}_low_battery_count`,
+        `binary_sensor.${prefix}_any_offline`,
+      ];
+    }
+    const prefix = `entity_availability_${group}`;
     return [
       `sensor.${prefix}_group_summary`,
       `sensor.${prefix}_offline_count`,
@@ -1059,6 +1198,42 @@ class EntityAvailabilityCardEditor extends LitElement {
     this._config = config;
   }
 
+  _getGroupOptions() {
+    if (!this.hass) return { regular: [], combined: [] };
+    const regular = Object.keys(this.hass.states)
+      .filter(
+        (id) =>
+          id.startsWith("sensor.entity_availability_") &&
+          !id.startsWith("sensor.entity_availability_combined_") &&
+          id.endsWith("_offline_count")
+      )
+      .map((id) =>
+        id
+          .replace("sensor.entity_availability_", "")
+          .replace("_offline_count", "")
+      )
+      .sort();
+    const combined = Object.keys(this.hass.states)
+      .filter(
+        (id) =>
+          id.startsWith("sensor.entity_availability_combined_") &&
+          id.endsWith("_combined_summary")
+      )
+      .map((id) =>
+        id
+          .replace("sensor.entity_availability_combined_", "")
+          .replace("_combined_summary", "")
+      )
+      .sort();
+    return { regular, combined };
+  }
+
+  _isSelectedGroupCombined() {
+    if (!this.hass || !this._config?.group) return false;
+    const slug = this._config.group;
+    return !!this.hass.states[`sensor.entity_availability_combined_${slug}_combined_summary`];
+  }
+
   render() {
     if (!this._config) return html``;
 
@@ -1066,12 +1241,35 @@ class EntityAvailabilityCardEditor extends LitElement {
       <div style="padding: 16px;">
         <div class="editor-row">
           <label>Group Slug</label>
-          <input
-            type="text"
-            .value=${this._config.group || ""}
-            @input=${(e) => this._updateConfig("group", e.target.value)}
-            placeholder="e.g. security_devices"
-          />
+          ${(() => {
+            const { regular, combined } = this._getGroupOptions();
+            const hasOptions = regular.length > 0 || combined.length > 0;
+            if (!hasOptions) {
+              return html`<input
+                type="text"
+                .value=${this._config.group || ""}
+                @input=${(e) => this._updateConfig("group", e.target.value)}
+                placeholder="e.g. security_devices"
+              />`;
+            }
+            return html`<select
+              .value=${this._config.group || ""}
+              @change=${(e) => this._updateConfig("group", e.target.value)}
+            >
+              ${regular.length > 0 ? html`
+                <optgroup label="Groups">
+                  ${regular.map(
+                    (slug) => html`<option value=${slug} ?selected=${this._config.group === slug}>${slug}</option>`
+                  )}
+                </optgroup>` : nothing}
+              ${combined.length > 0 ? html`
+                <optgroup label="Combined Groups">
+                  ${combined.map(
+                    (slug) => html`<option value=${slug} ?selected=${this._config.group === slug}>${slug}</option>`
+                  )}
+                </optgroup>` : nothing}
+            </select>`;
+          })()}
         </div>
         <div class="editor-row">
           <label>Title (optional)</label>
@@ -1082,6 +1280,7 @@ class EntityAvailabilityCardEditor extends LitElement {
             placeholder="Custom card title"
           />
         </div>
+        ${!this._isSelectedGroupCombined() ? html`
         <div class="editor-row checkbox">
           <label>
             <input
@@ -1092,6 +1291,7 @@ class EntityAvailabilityCardEditor extends LitElement {
             Show Availability Bars
           </label>
         </div>
+        ` : nothing}
         <div class="editor-row checkbox">
           <label>
             <input
@@ -1102,6 +1302,7 @@ class EntityAvailabilityCardEditor extends LitElement {
             Show Entity List
           </label>
         </div>
+        ${!this._isSelectedGroupCombined() ? html`
         <div class="editor-row">
           <label>Filter Entities (requires Show Entity List)</label>
           <select
@@ -1114,6 +1315,7 @@ class EntityAvailabilityCardEditor extends LitElement {
             <option value="online">Healthy only (online)</option>
           </select>
         </div>
+        ` : nothing}
         <div class="editor-row checkbox">
           <label>
             <input
@@ -1124,6 +1326,7 @@ class EntityAvailabilityCardEditor extends LitElement {
             Entity List Expanded by Default
           </label>
         </div>
+        ${!this._isSelectedGroupCombined() ? html`
         <div class="editor-row checkbox">
           <label>
             <input
@@ -1134,6 +1337,7 @@ class EntityAvailabilityCardEditor extends LitElement {
             Show Suppress/Unsuppress Buttons
           </label>
         </div>
+        ` : nothing}
         <div class="editor-row checkbox">
           <label>
             <input
@@ -1144,6 +1348,7 @@ class EntityAvailabilityCardEditor extends LitElement {
             Compact Mode
           </label>
         </div>
+        ${!this._isSelectedGroupCombined() ? html`
         <div class="editor-row">
           <label>Entity Detail</label>
           <select
@@ -1168,6 +1373,8 @@ class EntityAvailabilityCardEditor extends LitElement {
             <option value="battery_desc">Battery ↓ (strongest first)</option>
           </select>
         </div>
+        ` : nothing}
+        ${!this._isSelectedGroupCombined() ? html`
         <div class="threshold-section">
           <label>Availability Bar Colors & Thresholds</label>
           <div class="color-row">
@@ -1209,6 +1416,7 @@ class EntityAvailabilityCardEditor extends LitElement {
             />
           </div>
         </div>
+        ` : nothing}
       </div>
     `;
   }

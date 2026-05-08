@@ -2,11 +2,26 @@
   "config": {
     "step": {
       "user": {
+        "title": "Utwórz wpis",
+        "description": "Monitoruj grupę encji lub łącz istniejące grupy.",
+        "data": {
+          "entry_type": "Typ"
+        }
+      },
+      "group": {
         "title": "Utwórz grupę encji",
         "description": "Utwórz grupę encji do monitorowania dostępności.",
         "data": {
           "group_name": "Nazwa grupy",
           "entities": "Encje do monitorowania"
+        }
+      },
+      "combined": {
+        "title": "Utwórz grupę zbiorczą",
+        "description": "Połącz wiele grup w jeden widok dla automatyzacji i pulpitów.",
+        "data": {
+          "group_name": "Nazwa grupy zbiorczej",
+          "combined_groups": "Grupy do uwzględnienia"
         }
       },
       "monitoring": {
@@ -42,10 +57,12 @@
     },
     "error": {
       "empty_group_name": "Nazwa grupy nie może być pusta.",
-      "no_entities": "Musisz wybrać co najmniej jedną encję."
+      "no_entities": "Musisz wybrać co najmniej jedną encję.",
+      "not_enough_groups_selected": "Wybierz co najmniej dwie grupy do połączenia."
     },
     "abort": {
-      "already_configured": "Grupa o tej nazwie już istnieje."
+      "already_configured": "Grupa o tej nazwie już istnieje.",
+      "not_enough_groups": "Potrzebujesz co najmniej dwóch grup, zanim utworzysz grupę zbiorczą."
     }
   },
   "options": {
@@ -67,6 +84,14 @@
           "staleness_threshold": "Jeśli encja nie zmieniła stanu przez tę liczbę minut, jest oznaczana jako zdegradowana. Ustaw 0, aby wyłączyć.",
           "battery_threshold": "Oznacza encje, których bateria spada poniżej tego procentu. Stan 'low' jest również wykrywany automatycznie. Encje oparte na woltach nie są obsługiwane.",
           "availability_windows": "Okna czasowe do śledzenia historii dostępności grupy (np. dzisiaj, 3d, 7d)."
+        }
+      },
+      "combined_init": {
+        "title": "Edytuj grupę zbiorczą",
+        "description": "Zmień nazwę i uwzględnione grupy tej grupy zbiorczej.",
+        "data": {
+          "group_name": "Nazwa grupy zbiorczej",
+          "combined_groups": "Grupy do uwzględnienia"
         }
       },
       "battery_mapping": {
@@ -92,6 +117,9 @@
       "group_summary": {
         "name": "Podsumowanie grupy"
       },
+      "combined_summary": {
+        "name": "Podsumowanie zbiorcze"
+      },
       "availability_today": {
         "name": "Dostępność (dzisiaj)"
       },
@@ -108,6 +136,17 @@
     "binary_sensor": {
       "any_offline": {
         "name": "Dowolna encja offline"
+      },
+      "combined_any_offline": {
+        "name": "Dowolna encja offline"
+      }
+    }
+  },
+  "selector": {
+    "entry_type": {
+      "options": {
+        "group": "Monitoruj encje",
+        "combined_group": "Połącz grupy"
       }
     }
   }

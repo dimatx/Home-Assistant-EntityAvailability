@@ -29,6 +29,7 @@ from .const import (
     DEFAULT_COOLDOWN,
     DEFAULT_STALENESS_THRESHOLD,
     SCAN_INTERVAL,
+    STARTUP_GRACE_PERIOD,
     STORAGE_KEY_PREFIX,
     STORAGE_VERSION,
 )
@@ -75,6 +76,7 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
             hass, STORAGE_VERSION, f"{STORAGE_KEY_PREFIX}_{entry.entry_id}"
         )
         self._last_update: datetime | None = None
+        self._startup_time: datetime | None = None
         self._unsub_state_change: CALLBACK_TYPE | None = None
         self._debounce_cancel: CALLBACK_TYPE | None = None
         self._device_states: dict[str, DeviceState] = {}
@@ -121,6 +123,7 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
     async def async_config_entry_first_refresh(self) -> None:
         """Load stored data and do first refresh."""
         await self._async_load_storage()
+        self._startup_time = datetime.now(timezone.utc)
         await super().async_config_entry_first_refresh()
         self._setup_state_listeners()
 
@@ -153,15 +156,49 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
                                 self._suppressed[entity_id] = until
                         except (ValueError, TypeError):
                             pass
+            if "device_states" in stored:
+                for entity_id, ds in stored["device_states"].items():
+                    device = DeviceState(entity_id=entity_id)
+                    device.is_offline = ds.get("is_offline", False)
+                    try:
+                        device.offline_since = (
+                            datetime.fromisoformat(ds["offline_since"])
+                            if ds.get("offline_since")
+                            else None
+                        )
+                    except (ValueError, TypeError):
+                        device.offline_since = None
+                    try:
+                        device.cooldown_start = (
+                            datetime.fromisoformat(ds["cooldown_start"])
+                            if ds.get("cooldown_start")
+                            else None
+                        )
+                    except (ValueError, TypeError):
+                        device.cooldown_start = None
+                    self._device_states[entity_id] = device
 
     async def _async_save_storage(self) -> None:
         """Persist availability data."""
+        device_states_data: dict[str, dict] = {}
+        for entity_id, device in self._device_states.items():
+            if device.is_offline or device.cooldown_start is not None:
+                device_states_data[entity_id] = {
+                    "is_offline": device.is_offline,
+                    "offline_since": device.offline_since.isoformat()
+                    if device.offline_since
+                    else None,
+                    "cooldown_start": device.cooldown_start.isoformat()
+                    if device.cooldown_start
+                    else None,
+                }
         data = {
             "availability": self._availability_storage.to_dict(),
             "suppressed": {
                 entity_id: until.isoformat() if until else None
                 for entity_id, until in self._suppressed.items()
             },
+            "device_states": device_states_data,
         }
         await self._store.async_save(data)
         self._dirty = False
@@ -255,8 +292,13 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
                 if device.cooldown_start is None:
                     device.cooldown_start = now
                 cooldown_elapsed = (now - device.cooldown_start).total_seconds()
+                in_grace = (
+                    self._startup_time is not None
+                    and (now - self._startup_time).total_seconds()
+                    < STARTUP_GRACE_PERIOD
+                )
                 if cooldown_elapsed >= self._cooldown:
-                    if not device.is_offline:
+                    if not device.is_offline and not in_grace:
                         device.is_offline = True
                         device.offline_since = device.cooldown_start
                 else:

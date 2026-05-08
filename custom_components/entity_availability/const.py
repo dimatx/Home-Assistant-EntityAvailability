@@ -12,6 +12,12 @@ CONF_BATTERY_THRESHOLD = "battery_threshold"
 CONF_BATTERY_ENTITY_MAP = "battery_entity_map"
 CONF_AVAILABILITY_WINDOWS = "availability_windows"
 
+# Entry types
+CONF_ENTRY_TYPE = "entry_type"
+ENTRY_TYPE_GROUP = "group"
+ENTRY_TYPE_COMBINED = "combined_group"
+CONF_COMBINED_GROUPS = "combined_groups"
+
 # Defaults
 DEFAULT_NAME = "Entity Availability"
 DEFAULT_BAD_STATES = ["unavailable", "unknown"]
@@ -29,3 +35,6 @@ BUCKETS_MAX = 2016  # 7 days * 24 hours * 12 buckets/hour
 
 # Update interval for coordinator
 SCAN_INTERVAL = 30  # seconds
+
+# Grace period after HA startup before new offline transitions are allowed
+STARTUP_GRACE_PERIOD = 60  # seconds
