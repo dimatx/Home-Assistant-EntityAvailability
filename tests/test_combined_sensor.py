@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -17,10 +18,13 @@ from custom_components.entity_availability.combined_sensor import (
     CombinedLowBatteryCountSensor,
     CombinedLowBatterySensor,
     CombinedOfflineEntitiesSensor,
+    CombinedRecentlyOfflineSensor,
+    CombinedRecentlyRecoveredSensor,
     async_setup_entry,
 )
 from custom_components.entity_availability.const import (
     CONF_AVAILABILITY_WINDOWS,
+    CONF_BATTERY_ENTITY_MAP,
     CONF_COMBINED_GROUPS,
     CONF_ENTITIES,
     CONF_ENTRY_TYPE,
@@ -290,6 +294,91 @@ class TestCombinedGroupSensor:
         assert "Group A" in attrs["groups"]
         assert "Group B" in attrs["groups"]
 
+    def test_attributes_battery_powered_via_device_states(
+        self, mock_hass, combined_entry, coordinators
+    ):
+        """battery_powered counts devices with battery_level set when no battery map."""
+        mock_hass.data[DOMAIN] = {
+            "entry_a": coordinators[0],
+            "entry_b": coordinators[1],
+        }
+        coordinators[0]._device_states["binary_sensor.a1"].battery_level = 80
+        coordinators[1]._device_states["binary_sensor.b1"].battery_level = 55
+        sensor = self._sensor(mock_hass, combined_entry, coordinators)
+        attrs = sensor.extra_state_attributes
+        assert attrs["battery_powered"] == 2
+        assert attrs["groups"]["Group A"]["battery_powered"] == 1
+        assert attrs["groups"]["Group B"]["battery_powered"] == 1
+
+    def test_attributes_battery_powered_via_battery_map(
+        self, mock_hass, group_entry_a, group_entry_b, coordinators
+    ):
+        """battery_powered uses CONF_BATTERY_ENTITY_MAP when present."""
+
+        group_entry_a_with_map = MockConfigEntry(
+            version=1,
+            domain=DOMAIN,
+            title="Group A",
+            data={
+                CONF_ENTRY_TYPE: ENTRY_TYPE_GROUP,
+                CONF_GROUP_NAME: "Group A",
+                CONF_ENTITIES: ["binary_sensor.a1", "binary_sensor.a2"],
+                CONF_AVAILABILITY_WINDOWS: DEFAULT_AVAILABILITY_WINDOWS,
+                CONF_BATTERY_ENTITY_MAP: {
+                    "binary_sensor.a1": "sensor.a1_battery",
+                    "binary_sensor.a2": None,
+                },
+            },
+            entry_id="entry_a",
+        )
+        combined_entry = MockConfigEntry(
+            version=1,
+            domain=DOMAIN,
+            title="Combined",
+            data={
+                CONF_ENTRY_TYPE: ENTRY_TYPE_COMBINED,
+                CONF_GROUP_NAME: "Combined",
+                CONF_COMBINED_GROUPS: ["entry_a", "entry_b"],
+            },
+            entry_id="combined_1",
+        )
+        with patch.object(
+            EntityAvailabilityCoordinator, "_async_save_storage", new_callable=AsyncMock
+        ):
+            coord_a = EntityAvailabilityCoordinator(mock_hass, group_entry_a_with_map)
+            coord_a._device_states = {
+                "binary_sensor.a1": DeviceState(entity_id="binary_sensor.a1"),
+                "binary_sensor.a2": DeviceState(entity_id="binary_sensor.a2"),
+            }
+        mock_hass.data[DOMAIN] = {
+            "entry_a": coord_a,
+            "entry_b": coordinators[1],
+        }
+        sensor = CombinedGroupSensor(
+            mock_hass,
+            combined_entry,
+            "Combined",
+            "combined",
+            [coord_a, coordinators[1]],
+            ["entry_a", "entry_b"],
+        )
+        attrs = sensor.extra_state_attributes
+        # Group A: 1 non-None value in map; Group B: no map → 0
+        assert attrs["groups"]["Group A"]["battery_powered"] == 1
+        assert attrs["groups"]["Group B"]["battery_powered"] == 0
+        assert attrs["battery_powered"] == 1
+
+    def test_attributes_battery_powered_zero_when_no_battery(
+        self, mock_hass, combined_entry, coordinators
+    ):
+        """battery_powered is 0 when no devices have battery_level set."""
+        mock_hass.data[DOMAIN] = {
+            "entry_a": coordinators[0],
+            "entry_b": coordinators[1],
+        }
+        sensor = self._sensor(mock_hass, combined_entry, coordinators)
+        assert sensor.extra_state_attributes["battery_powered"] == 0
+
     def test_attributes_missing_groups(self, mock_hass, combined_entry, coordinators):
         """missing_groups attribute present when a source group is not in hass.data."""
         # Only load entry_a
@@ -551,3 +640,380 @@ class TestAsyncSetupEntry:
         await async_setup_entry(mock_hass, combined_entry, _fake_add)
         # Sensors were registered
         assert len(added) > 0
+
+    async def test_setup_registers_six_sensors(
+        self, mock_hass: HomeAssistant, group_entry_a, group_entry_b, combined_entry
+    ):
+        """async_setup_entry registers exactly 6 sensors (including recently_offline/recovered)."""
+        coord_a = MagicMock(spec=EntityAvailabilityCoordinator)
+        coord_a.entry = group_entry_a
+        coord_b = MagicMock(spec=EntityAvailabilityCoordinator)
+        coord_b.entry = group_entry_b
+        mock_hass.data[DOMAIN] = {"entry_a": coord_a, "entry_b": coord_b}
+
+        group_entry_a.add_to_hass(mock_hass)
+        group_entry_b.add_to_hass(mock_hass)
+        combined_entry.add_to_hass(mock_hass)
+
+        added = []
+
+        def _fake_add(entities):
+            added.extend(entities)
+
+        await async_setup_entry(mock_hass, combined_entry, _fake_add)
+        assert len(added) == 6
+        types = {type(s) for s in added}
+        assert CombinedRecentlyOfflineSensor in types
+        assert CombinedRecentlyRecoveredSensor in types
+
+
+# ---------------------------------------------------------------------------
+# CombinedRecentlyOfflineSensor
+# ---------------------------------------------------------------------------
+
+_NOW = datetime(2026, 5, 9, 12, 0, 0, tzinfo=timezone.utc)
+
+
+def _make_recently_offline_sensor(hass, entry, coordinators):
+    return CombinedRecentlyOfflineSensor(
+        hass,
+        entry,
+        "Combined",
+        "combined",
+        coordinators,
+        [c.entry.entry_id for c in coordinators],
+    )
+
+
+def _make_recently_recovered_sensor(hass, entry, coordinators):
+    return CombinedRecentlyRecoveredSensor(
+        hass,
+        entry,
+        "Combined",
+        "combined",
+        coordinators,
+        [c.entry.entry_id for c in coordinators],
+    )
+
+
+class TestCombinedRecentlyOfflineSensor:
+    """Tests for CombinedRecentlyOfflineSensor."""
+
+    def test_native_value_none_when_no_recent_offline(
+        self, mock_hass, combined_entry, coordinators
+    ):
+        """Returns 'None' when no devices went offline recently."""
+        mock_hass.data[DOMAIN] = {
+            "entry_a": coordinators[0],
+            "entry_b": coordinators[1],
+        }
+        sensor = _make_recently_offline_sensor(mock_hass, combined_entry, coordinators)
+        assert sensor.native_value == "None"
+
+    def test_native_value_within_window(self, mock_hass, combined_entry, coordinators):
+        """Returns friendly name of device that went offline within window."""
+        mock_hass.data[DOMAIN] = {
+            "entry_a": coordinators[0],
+            "entry_b": coordinators[1],
+        }
+        coordinators[0]._device_states["binary_sensor.a2"].recently_offline_at = (
+            _NOW - timedelta(minutes=2)
+        )
+        mock_hass.states.async_set(
+            "binary_sensor.a2", STATE_UNAVAILABLE, {"friendly_name": "Sensor A2"}
+        )
+        sensor = _make_recently_offline_sensor(mock_hass, combined_entry, coordinators)
+        with patch(
+            "custom_components.entity_availability.combined_sensor.datetime"
+        ) as mock_dt:
+            mock_dt.now.return_value = _NOW
+            value = sensor.native_value
+        assert "Sensor A2" in value
+
+    def test_native_value_outside_window_excluded(
+        self, mock_hass, combined_entry, coordinators
+    ):
+        """Device that went offline beyond the window is excluded."""
+        mock_hass.data[DOMAIN] = {
+            "entry_a": coordinators[0],
+            "entry_b": coordinators[1],
+        }
+        # Default recovery_window_minutes = 5; set offline 10 min ago
+        coordinators[0]._device_states["binary_sensor.a2"].recently_offline_at = (
+            _NOW - timedelta(minutes=10)
+        )
+        sensor = _make_recently_offline_sensor(mock_hass, combined_entry, coordinators)
+        with patch(
+            "custom_components.entity_availability.combined_sensor.datetime"
+        ) as mock_dt:
+            mock_dt.now.return_value = _NOW
+            value = sensor.native_value
+        assert value == "None"
+
+    def test_aggregates_across_groups(self, mock_hass, combined_entry, coordinators):
+        """Devices from multiple groups all appear in native_value."""
+        mock_hass.data[DOMAIN] = {
+            "entry_a": coordinators[0],
+            "entry_b": coordinators[1],
+        }
+        coordinators[0]._device_states["binary_sensor.a2"].recently_offline_at = (
+            _NOW - timedelta(minutes=1)
+        )
+        coordinators[1]._device_states["binary_sensor.b1"].is_offline = True
+        coordinators[1]._device_states["binary_sensor.b1"].recently_offline_at = (
+            _NOW - timedelta(minutes=1)
+        )
+        mock_hass.states.async_set(
+            "binary_sensor.a2", STATE_UNAVAILABLE, {"friendly_name": "Sensor A2"}
+        )
+        mock_hass.states.async_set(
+            "binary_sensor.b1", STATE_UNAVAILABLE, {"friendly_name": "Sensor B1"}
+        )
+        sensor = _make_recently_offline_sensor(mock_hass, combined_entry, coordinators)
+        with patch(
+            "custom_components.entity_availability.combined_sensor.datetime"
+        ) as mock_dt:
+            mock_dt.now.return_value = _NOW
+            attrs = sensor.extra_state_attributes
+        assert attrs["count"] == 2
+        assert "binary_sensor.a2" in attrs["entities"]
+        assert "binary_sensor.b1" in attrs["entities"]
+
+    def test_suppressed_excluded(self, mock_hass, combined_entry, coordinators):
+        """Suppressed devices not included even if recently_offline_at is set."""
+        mock_hass.data[DOMAIN] = {
+            "entry_a": coordinators[0],
+            "entry_b": coordinators[1],
+        }
+        d = coordinators[0]._device_states["binary_sensor.a2"]
+        d.recently_offline_at = _NOW - timedelta(minutes=1)
+        d.is_suppressed = True
+        sensor = _make_recently_offline_sensor(mock_hass, combined_entry, coordinators)
+        with patch(
+            "custom_components.entity_availability.combined_sensor.datetime"
+        ) as mock_dt:
+            mock_dt.now.return_value = _NOW
+            value = sensor.native_value
+        assert value == "None"
+
+    def test_truncates_long_value(self, mock_hass, combined_entry, coordinators):
+        """native_value truncated to MAX_STATE_LENGTH."""
+        mock_hass.data[DOMAIN] = {
+            "entry_a": coordinators[0],
+            "entry_b": coordinators[1],
+        }
+        for i in range(30):
+            eid = f"binary_sensor.recent_{i:03d}"
+            coordinators[0]._device_states[eid] = DeviceState(
+                entity_id=eid,
+                is_offline=True,
+                recently_offline_at=_NOW - timedelta(minutes=1),
+            )
+            mock_hass.states.async_set(
+                eid,
+                STATE_UNAVAILABLE,
+                {"friendly_name": f"Very Long Device Name Number {i:03d}"},
+            )
+        sensor = _make_recently_offline_sensor(mock_hass, combined_entry, coordinators)
+        with patch(
+            "custom_components.entity_availability.combined_sensor.datetime"
+        ) as mock_dt:
+            mock_dt.now.return_value = _NOW
+            value = sensor.native_value
+        assert len(value) <= MAX_STATE_LENGTH
+        assert value.endswith("...")
+
+    def test_uses_per_group_window(self, mock_hass, combined_entry, coordinators):
+        """Each group's own recovery_window_minutes is used for filtering."""
+        from custom_components.entity_availability.const import CONF_RECOVERY_WINDOW
+
+        mock_hass.data[DOMAIN] = {
+            "entry_a": coordinators[0],
+            "entry_b": coordinators[1],
+        }
+        # Give coord_a a 5-min window and coord_b a 1-min window via entry data
+        coordinators[0].entry = MockConfigEntry(
+            version=1,
+            domain=DOMAIN,
+            title="Group A",
+            data={**coordinators[0].entry.data, CONF_RECOVERY_WINDOW: 5},
+            entry_id="entry_a",
+        )
+        coordinators[1].entry = MockConfigEntry(
+            version=1,
+            domain=DOMAIN,
+            title="Group B",
+            data={**coordinators[1].entry.data, CONF_RECOVERY_WINDOW: 1},
+            entry_id="entry_b",
+        )
+        # a2 went offline 3 min ago — within coord_a 5-min window
+        coordinators[0]._device_states["binary_sensor.a2"].recently_offline_at = (
+            _NOW - timedelta(minutes=3)
+        )
+        # b1 went offline 3 min ago — outside coord_b 1-min window
+        coordinators[1]._device_states["binary_sensor.b1"].is_offline = True
+        coordinators[1]._device_states["binary_sensor.b1"].recently_offline_at = (
+            _NOW - timedelta(minutes=3)
+        )
+        mock_hass.states.async_set(
+            "binary_sensor.a2", STATE_UNAVAILABLE, {"friendly_name": "Sensor A2"}
+        )
+        sensor = _make_recently_offline_sensor(mock_hass, combined_entry, coordinators)
+        with patch(
+            "custom_components.entity_availability.combined_sensor.datetime"
+        ) as mock_dt:
+            mock_dt.now.return_value = _NOW
+            attrs = sensor.extra_state_attributes
+        assert attrs["count"] == 1
+        assert "binary_sensor.a2" in attrs["entities"]
+        assert "binary_sensor.b1" not in attrs["entities"]
+
+    def test_unique_id(self, mock_hass, combined_entry, coordinators):
+        mock_hass.data[DOMAIN] = {}
+        sensor = _make_recently_offline_sensor(mock_hass, combined_entry, coordinators)
+        assert sensor.unique_id == "combined_1_combined_recently_offline"
+
+
+# ---------------------------------------------------------------------------
+# CombinedRecentlyRecoveredSensor
+# ---------------------------------------------------------------------------
+
+
+class TestCombinedRecentlyRecoveredSensor:
+    """Tests for CombinedRecentlyRecoveredSensor."""
+
+    def test_native_value_none_when_no_recent_recovery(
+        self, mock_hass, combined_entry, coordinators
+    ):
+        """Returns 'None' when no devices recovered recently."""
+        mock_hass.data[DOMAIN] = {
+            "entry_a": coordinators[0],
+            "entry_b": coordinators[1],
+        }
+        sensor = _make_recently_recovered_sensor(
+            mock_hass, combined_entry, coordinators
+        )
+        assert sensor.native_value == "None"
+
+    def test_native_value_within_window(self, mock_hass, combined_entry, coordinators):
+        """Returns friendly name of device that recovered within window."""
+        mock_hass.data[DOMAIN] = {
+            "entry_a": coordinators[0],
+            "entry_b": coordinators[1],
+        }
+        coordinators[0]._device_states["binary_sensor.a1"].last_recovery = (
+            _NOW - timedelta(minutes=2)
+        )
+        mock_hass.states.async_set(
+            "binary_sensor.a1", STATE_ON, {"friendly_name": "Sensor A1"}
+        )
+        sensor = _make_recently_recovered_sensor(
+            mock_hass, combined_entry, coordinators
+        )
+        with patch(
+            "custom_components.entity_availability.combined_sensor.datetime"
+        ) as mock_dt:
+            mock_dt.now.return_value = _NOW
+            value = sensor.native_value
+        assert "Sensor A1" in value
+
+    def test_offline_devices_excluded(self, mock_hass, combined_entry, coordinators):
+        """Devices still offline are not included even if last_recovery is set."""
+        mock_hass.data[DOMAIN] = {
+            "entry_a": coordinators[0],
+            "entry_b": coordinators[1],
+        }
+        d = coordinators[0]._device_states["binary_sensor.a2"]
+        # a2 is_offline=True; set last_recovery anyway
+        d.last_recovery = _NOW - timedelta(minutes=1)
+        sensor = _make_recently_recovered_sensor(
+            mock_hass, combined_entry, coordinators
+        )
+        with patch(
+            "custom_components.entity_availability.combined_sensor.datetime"
+        ) as mock_dt:
+            mock_dt.now.return_value = _NOW
+            value = sensor.native_value
+        assert value == "None"
+
+    def test_aggregates_across_groups(self, mock_hass, combined_entry, coordinators):
+        """Recovered devices from multiple groups all appear."""
+        mock_hass.data[DOMAIN] = {
+            "entry_a": coordinators[0],
+            "entry_b": coordinators[1],
+        }
+        coordinators[0]._device_states["binary_sensor.a1"].last_recovery = (
+            _NOW - timedelta(minutes=1)
+        )
+        coordinators[1]._device_states["binary_sensor.b1"].last_recovery = (
+            _NOW - timedelta(minutes=1)
+        )
+        mock_hass.states.async_set(
+            "binary_sensor.a1", STATE_ON, {"friendly_name": "Sensor A1"}
+        )
+        mock_hass.states.async_set(
+            "binary_sensor.b1", STATE_ON, {"friendly_name": "Sensor B1"}
+        )
+        sensor = _make_recently_recovered_sensor(
+            mock_hass, combined_entry, coordinators
+        )
+        with patch(
+            "custom_components.entity_availability.combined_sensor.datetime"
+        ) as mock_dt:
+            mock_dt.now.return_value = _NOW
+            attrs = sensor.extra_state_attributes
+        assert attrs["count"] == 2
+        assert "binary_sensor.a1" in attrs["entities"]
+        assert "binary_sensor.b1" in attrs["entities"]
+
+    def test_uses_per_group_window(self, mock_hass, combined_entry, coordinators):
+        """Each group's own recovery_window_minutes is used."""
+        from custom_components.entity_availability.const import CONF_RECOVERY_WINDOW
+
+        mock_hass.data[DOMAIN] = {
+            "entry_a": coordinators[0],
+            "entry_b": coordinators[1],
+        }
+        coordinators[0].entry = MockConfigEntry(
+            version=1,
+            domain=DOMAIN,
+            title="Group A",
+            data={**coordinators[0].entry.data, CONF_RECOVERY_WINDOW: 5},
+            entry_id="entry_a",
+        )
+        coordinators[1].entry = MockConfigEntry(
+            version=1,
+            domain=DOMAIN,
+            title="Group B",
+            data={**coordinators[1].entry.data, CONF_RECOVERY_WINDOW: 1},
+            entry_id="entry_b",
+        )
+        # a1 recovered 3 min ago — within coord_a 5-min window
+        coordinators[0]._device_states["binary_sensor.a1"].last_recovery = (
+            _NOW - timedelta(minutes=3)
+        )
+        # b1 recovered 3 min ago — outside coord_b 1-min window
+        coordinators[1]._device_states["binary_sensor.b1"].last_recovery = (
+            _NOW - timedelta(minutes=3)
+        )
+        mock_hass.states.async_set(
+            "binary_sensor.a1", STATE_ON, {"friendly_name": "Sensor A1"}
+        )
+        sensor = _make_recently_recovered_sensor(
+            mock_hass, combined_entry, coordinators
+        )
+        with patch(
+            "custom_components.entity_availability.combined_sensor.datetime"
+        ) as mock_dt:
+            mock_dt.now.return_value = _NOW
+            attrs = sensor.extra_state_attributes
+        assert attrs["count"] == 1
+        assert "binary_sensor.a1" in attrs["entities"]
+        assert "binary_sensor.b1" not in attrs["entities"]
+
+    def test_unique_id(self, mock_hass, combined_entry, coordinators):
+        mock_hass.data[DOMAIN] = {}
+        sensor = _make_recently_recovered_sensor(
+            mock_hass, combined_entry, coordinators
+        )
+        assert sensor.unique_id == "combined_1_combined_recently_recovered"

@@ -210,13 +210,17 @@ For example, a combined group named "All Devices" produces the slug `all_devices
 
 | Entity | Type | State | Notes |
 |--------|------|-------|-------|
-| `sensor..._combined_summary` | Sensor | Total offline count across all source groups | Attributes: `total_entities`, `online`, `offline`, `stale`, `low_battery`, `suppressed`, `groups`, `offline_entities`, `low_battery_entities`. The `groups` attribute is a dict keyed by group name: `{group_name: {total, online, offline, stale, low_battery, suppressed}}` |
+| `sensor..._combined_summary` | Sensor | Total offline count across all source groups | Attributes: `total_entities`, `online`, `offline`, `stale`, `low_battery`, `suppressed`, `battery_powered`, `groups`, `offline_entities`, `low_battery_entities`. The `groups` attribute is a dict keyed by group name: `{group_name: {total, online, offline, stale, low_battery, suppressed, battery_powered}}` |
 | `sensor..._offline_entities` | Sensor | Comma-separated names of offline entities (`"None"` when all online) | Attributes: `entities` (list of entity IDs), `count` |
+| `sensor..._recently_offline` | Sensor | Comma-separated friendly names of entities that went offline within each source group's recovery window (`"None"` when empty) | `entities` (list of entity IDs), `count` |
+| `sensor..._recently_recovered` | Sensor | Comma-separated friendly names of entities that recovered within each source group's recovery window (`"None"` when empty) | `entities` (list of entity IDs), `count` |
 | `sensor..._low_battery` | Sensor | Comma-separated names of low battery entities (`"None"` when all OK) | Attributes: `devices` (dict of entity ID → battery level), `count` |
 | `sensor..._low_battery_count` | Sensor | Number of entities with low battery across all groups | — |
 | `binary_sensor..._any_offline` | Binary Sensor (Problem) | ON when any entity across all groups is offline | Attributes: `offline_entities`, `offline_count` |
 
 Suppressed entities are excluded from all combined sensor states, consistent with per-group behaviour.
+
+The `recently_offline` and `recently_recovered` sensors use each source group's own **Recovery window** setting — if groups have different windows, each group's devices are filtered by that group's window.
 
 ![Combined Group Sensors](custom_components/entity_availability/docs/05b_combined_sensors.png)
 
@@ -447,6 +451,52 @@ For combined groups you can also read `low_battery` directly from the summary se
 ```
 
 This is equivalent to `states('sensor.entity_availability_all_devices_low_battery_count')`.
+
+You can also read `battery_powered` from the same sensor:
+
+```yaml
+{{ state_attr('sensor.entity_availability_all_devices_combined_summary', 'battery_powered') | int(0) }}
+```
+
+### Notify which device just went offline (combined group)
+
+Uses `sensor.*_recently_offline` on a combined group — fires each time a new device across any included group drops off.
+
+```yaml
+automation:
+  - alias: "Notify which device just went offline (all devices)"
+    trigger:
+      - platform: state
+        entity_id: sensor.entity_availability_all_devices_recently_offline
+    condition:
+      - condition: template
+        value_template: "{{ trigger.to_state.state != 'None' and trigger.to_state.state != trigger.from_state.state }}"
+    action:
+      - service: notify.mobile_app
+        data:
+          title: "Device Went Offline"
+          message: >
+            {{ trigger.to_state.state }} went offline.
+```
+
+### Notify which device just recovered (combined group)
+
+```yaml
+automation:
+  - alias: "Notify which device just recovered (all devices)"
+    trigger:
+      - platform: state
+        entity_id: sensor.entity_availability_all_devices_recently_recovered
+    condition:
+      - condition: template
+        value_template: "{{ trigger.to_state.state != 'None' and trigger.to_state.state != trigger.from_state.state }}"
+    action:
+      - service: notify.mobile_app
+        data:
+          title: "Device Recovered"
+          message: >
+            {{ trigger.to_state.state }} came back online.
+```
 
 ### Daily availability report
 

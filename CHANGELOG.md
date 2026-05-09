@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0-beta.3] - 2026-05-09
+
+### Added
+- Combined groups: `sensor.*_recently_offline` — aggregates recently offline entities from all member groups into a single sensor; uses each source group's own recovery window
+- Combined groups: `sensor.*_recently_recovered` — aggregates recently recovered entities from all member groups; same per-group window logic
+- Combined groups: `battery_powered` count added to `sensor.*_combined_summary` attributes (top-level total and per-group breakdown in the `groups` attribute)
+
 ## [0.3.0-beta.2] - 2026-05-09
 
 ### Added

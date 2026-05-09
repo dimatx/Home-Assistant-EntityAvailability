@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from datetime import datetime, timezone
 from typing import Any
 
 from homeassistant.components.sensor import SensorEntity, SensorStateClass
@@ -13,6 +14,7 @@ from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
+    CONF_BATTERY_ENTITY_MAP,
     CONF_COMBINED_GROUPS,
     CONF_GROUP_NAME,
     DOMAIN,
@@ -50,6 +52,12 @@ async def async_setup_entry(
                 hass, entry, group_name, group_slug, coordinators, combined_entry_ids
             ),
             CombinedLowBatteryCountSensor(
+                hass, entry, group_name, group_slug, coordinators, combined_entry_ids
+            ),
+            CombinedRecentlyOfflineSensor(
+                hass, entry, group_name, group_slug, coordinators, combined_entry_ids
+            ),
+            CombinedRecentlyRecoveredSensor(
                 hass, entry, group_name, group_slug, coordinators, combined_entry_ids
             ),
         ]
@@ -139,7 +147,9 @@ class CombinedGroupSensor(CombinedSensorBase):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        total = online = offline = stale = low_battery = suppressed = 0
+        total = online = offline = stale = low_battery = suppressed = (
+            battery_powered
+        ) = 0
         offline_entities: list[str] = []
         low_battery_entities: list[str] = []
         groups: dict[str, Any] = {}
@@ -160,12 +170,20 @@ class CombinedGroupSensor(CombinedSensorBase):
                 for d in states.values()
                 if d.is_degraded and not d.is_suppressed and d.battery_level is not None
             )
+            battery_map = coord.entry.data.get(CONF_BATTERY_ENTITY_MAP, {})
+            if battery_map:
+                g_battery_powered = sum(1 for v in battery_map.values() if v)
+            else:
+                g_battery_powered = sum(
+                    1 for d in states.values() if d.battery_level is not None
+                )
             total += g_total
             online += g_online
             offline += g_offline
             stale += g_stale
             low_battery += g_low_battery
             suppressed += g_suppressed
+            battery_powered += g_battery_powered
             offline_entities += [
                 d.entity_id
                 for d in states.values()
@@ -184,6 +202,7 @@ class CombinedGroupSensor(CombinedSensorBase):
                 "stale": g_stale,
                 "low_battery": g_low_battery,
                 "suppressed": g_suppressed,
+                "battery_powered": g_battery_powered,
             }
 
         attrs: dict[str, Any] = {
@@ -193,6 +212,7 @@ class CombinedGroupSensor(CombinedSensorBase):
             "stale": stale,
             "low_battery": low_battery,
             "suppressed": suppressed,
+            "battery_powered": battery_powered,
             "groups": groups,
             "offline_entities": offline_entities,
             "low_battery_entities": low_battery_entities,
@@ -314,3 +334,99 @@ class CombinedLowBatteryCountSensor(CombinedSensorBase):
             for d in coord.device_states.values()
             if d.is_degraded and not d.is_suppressed and d.battery_level is not None
         )
+
+
+class CombinedRecentlyOfflineSensor(CombinedSensorBase):
+    """Sensor showing entities that recently went offline across all included groups."""
+
+    _attr_icon = "mdi:lan-disconnect"
+    _attr_has_entity_name = True
+
+    def __init__(
+        self, hass, entry, group_name, group_slug, coordinators, combined_entry_ids
+    ):
+        super().__init__(
+            hass, entry, group_name, group_slug, coordinators, combined_entry_ids
+        )
+        self._attr_unique_id = f"{entry.entry_id}_combined_recently_offline"
+        self._attr_name = "Recently Offline"
+
+    def _matching_devices(self):
+        now = datetime.now(timezone.utc)
+        result = []
+        for coord in self._active_coordinators():
+            cutoff = coord.recovery_window_minutes * 60
+            result += [
+                d
+                for d in coord.device_states.values()
+                if d.is_offline
+                and not d.is_suppressed
+                and d.recently_offline_at is not None
+                and (now - d.recently_offline_at).total_seconds() <= cutoff
+            ]
+        return result
+
+    @property
+    def native_value(self) -> str:
+        devices = self._matching_devices()
+        if not devices:
+            return "None"
+        result = ", ".join(_friendly_name(self.hass, d.entity_id) for d in devices)
+        return (
+            result[: MAX_STATE_LENGTH - 3] + "..."
+            if len(result) > MAX_STATE_LENGTH - 3
+            else result
+        )
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        devices = self._matching_devices()
+        return {"entities": [d.entity_id for d in devices], "count": len(devices)}
+
+
+class CombinedRecentlyRecoveredSensor(CombinedSensorBase):
+    """Sensor showing entities that recently recovered across all included groups."""
+
+    _attr_icon = "mdi:lan-connect"
+    _attr_has_entity_name = True
+
+    def __init__(
+        self, hass, entry, group_name, group_slug, coordinators, combined_entry_ids
+    ):
+        super().__init__(
+            hass, entry, group_name, group_slug, coordinators, combined_entry_ids
+        )
+        self._attr_unique_id = f"{entry.entry_id}_combined_recently_recovered"
+        self._attr_name = "Recently Recovered"
+
+    def _matching_devices(self):
+        now = datetime.now(timezone.utc)
+        result = []
+        for coord in self._active_coordinators():
+            cutoff = coord.recovery_window_minutes * 60
+            result += [
+                d
+                for d in coord.device_states.values()
+                if not d.is_offline
+                and not d.is_suppressed
+                and d.last_recovery is not None
+                and (now - d.last_recovery).total_seconds() <= cutoff
+            ]
+        return result
+
+    @property
+    def native_value(self) -> str:
+        devices = self._matching_devices()
+        if not devices:
+            return "None"
+        result = ", ".join(_friendly_name(self.hass, d.entity_id) for d in devices)
+        return (
+            result[: MAX_STATE_LENGTH - 3] + "..."
+            if len(result) > MAX_STATE_LENGTH - 3
+            else result
+        )
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        devices = self._matching_devices()
+        return {"entities": [d.entity_id for d in devices], "count": len(devices)}
