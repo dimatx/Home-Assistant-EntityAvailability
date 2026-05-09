@@ -18,7 +18,9 @@ from custom_components.entity_availability.models import DeviceState
 from custom_components.entity_availability.services import (
     ATTR_DURATION,
     ATTR_ENTITY_ID,
+    ATTR_GROUP,
     SERVICE_SUPPRESS,
+    SERVICE_SUPPRESS_INDEFINITELY,
     SERVICE_UNSUPPRESS,
     async_setup_services,
 )
@@ -198,3 +200,225 @@ async def test_unsuppress_calls_async_set_updated_data(setup_services) -> None:
             blocking=True,
         )
         mock_update.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# suppress_indefinitely service
+# ---------------------------------------------------------------------------
+
+
+async def test_suppress_indefinitely_sets_no_expiry(setup_services) -> None:
+    """suppress_indefinitely sets suppression with suppress_until=None."""
+    hass, coord = setup_services
+
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_SUPPRESS_INDEFINITELY,
+        {ATTR_ENTITY_ID: "binary_sensor.device_a"},
+        blocking=True,
+    )
+
+    device_a = coord.device_states["binary_sensor.device_a"]
+    assert device_a.is_suppressed is True
+    assert device_a.suppress_until is None
+
+
+async def test_suppress_indefinitely_by_group(setup_services) -> None:
+    """suppress_indefinitely with group suppresses all entities in the group indefinitely."""
+    hass, coord = setup_services
+
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_SUPPRESS_INDEFINITELY,
+        {ATTR_GROUP: "Test Group"},
+        blocking=True,
+    )
+
+    # All monitored entities should be suppressed (some may only be in _suppressed)
+    for entity_id in coord.monitored_entities:
+        if entity_id in coord.device_states:
+            device = coord.device_states[entity_id]
+            assert device.is_suppressed is True
+            assert device.suppress_until is None
+        else:
+            # Entity not yet in _device_states — suppression stored in _suppressed
+            assert entity_id in coord._suppressed
+            assert coord._suppressed[entity_id] is None
+
+
+async def test_suppress_indefinitely_unknown_entity_logs_warning(
+    setup_services, caplog
+) -> None:
+    """suppress_indefinitely logs a warning when entity is not in any group."""
+    hass, coord = setup_services
+
+    with caplog.at_level(logging.WARNING):
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_SUPPRESS_INDEFINITELY,
+            {ATTR_ENTITY_ID: "sensor.nonexistent"},
+            blocking=True,
+        )
+
+    assert "not found in any monitored group" in caplog.text
+
+
+async def test_suppress_indefinitely_unknown_group_logs_warning(
+    setup_services, caplog
+) -> None:
+    """suppress_indefinitely logs a warning when the group name is unknown."""
+    hass, coord = setup_services
+
+    with caplog.at_level(logging.WARNING):
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_SUPPRESS_INDEFINITELY,
+            {ATTR_GROUP: "No Such Group"},
+            blocking=True,
+        )
+
+    assert "not found" in caplog.text
+
+
+async def test_suppress_indefinitely_no_args_logs_warning(
+    setup_services, caplog
+) -> None:
+    """suppress_indefinitely logs a warning when neither entity_id nor group is provided."""
+    hass, coord = setup_services
+
+    with caplog.at_level(logging.WARNING):
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_SUPPRESS_INDEFINITELY,
+            {},
+            blocking=True,
+        )
+
+    assert "Either entity_id or group must be provided" in caplog.text
+
+
+async def test_suppress_indefinitely_calls_async_set_updated_data(
+    setup_services,
+) -> None:
+    """suppress_indefinitely triggers a data update notification."""
+    hass, coord = setup_services
+
+    with patch.object(coord, "async_set_updated_data") as mock_update:
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_SUPPRESS_INDEFINITELY,
+            {ATTR_ENTITY_ID: "binary_sensor.device_a"},
+            blocking=True,
+        )
+        mock_update.assert_called_once()
+
+
+async def test_suppress_service_by_group(setup_services) -> None:
+    """suppress service with group= suppresses all entities in the group."""
+    hass, coord = setup_services
+
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_SUPPRESS,
+        {ATTR_GROUP: "Test Group", ATTR_DURATION: 30},
+        blocking=True,
+    )
+
+    for entity_id in coord.monitored_entities:
+        if entity_id in coord.device_states:
+            device = coord.device_states[entity_id]
+            assert device.is_suppressed is True
+            expected_until = datetime.now(timezone.utc) + timedelta(minutes=30)
+            diff = abs((device.suppress_until - expected_until).total_seconds())
+            assert diff < 5
+        else:
+            assert entity_id in coord._suppressed
+            assert coord._suppressed[entity_id] is not None
+
+
+async def test_suppress_service_unknown_group_logs_warning(
+    setup_services, caplog
+) -> None:
+    """suppress service logs a warning when the group name is not found."""
+    hass, coord = setup_services
+
+    with caplog.at_level(logging.WARNING):
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_SUPPRESS,
+            {ATTR_GROUP: "No Such Group", ATTR_DURATION: 10},
+            blocking=True,
+        )
+
+    assert "not found" in caplog.text
+
+
+async def test_suppress_service_no_args_logs_warning(setup_services, caplog) -> None:
+    """suppress service logs a warning when neither entity_id nor group is given."""
+    hass, coord = setup_services
+
+    with caplog.at_level(logging.WARNING):
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_SUPPRESS,
+            {ATTR_DURATION: 10},
+            blocking=True,
+        )
+
+    assert "Either entity_id or group must be provided" in caplog.text
+
+
+async def test_unsuppress_service_by_group(setup_services) -> None:
+    """unsuppress service with group= clears suppression for all entities in the group."""
+    hass, coord = setup_services
+
+    # First suppress all
+    for eid in coord.monitored_entities:
+        coord.suppress_entity(eid, datetime.now(timezone.utc) + timedelta(hours=1))
+
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_UNSUPPRESS,
+        {ATTR_GROUP: "Test Group"},
+        blocking=True,
+    )
+
+    for entity_id in coord.monitored_entities:
+        if entity_id in coord.device_states:
+            device = coord.device_states[entity_id]
+            assert device.is_suppressed is False
+            assert device.suppress_until is None
+        # Either way the entity should be absent from _suppressed
+        assert entity_id not in coord._suppressed
+
+
+async def test_unsuppress_service_unknown_group_logs_warning(
+    setup_services, caplog
+) -> None:
+    """unsuppress service logs a warning when the group name is not found."""
+    hass, coord = setup_services
+
+    with caplog.at_level(logging.WARNING):
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_UNSUPPRESS,
+            {ATTR_GROUP: "No Such Group"},
+            blocking=True,
+        )
+
+    assert "not found" in caplog.text
+
+
+async def test_unsuppress_service_no_args_logs_warning(setup_services, caplog) -> None:
+    """unsuppress service logs a warning when neither entity_id nor group is given."""
+    hass, coord = setup_services
+
+    with caplog.at_level(logging.WARNING):
+        await hass.services.async_call(
+            DOMAIN,
+            SERVICE_UNSUPPRESS,
+            {},
+            blocking=True,
+        )
+
+    assert "Either entity_id or group must be provided" in caplog.text

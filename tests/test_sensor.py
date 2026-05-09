@@ -22,6 +22,8 @@ from custom_components.entity_availability.sensor import (
     MAX_STATE_LENGTH,
     OfflineCountSensor,
     OfflineDevicesSensor,
+    RecentlyOfflineSensor,
+    RecentlyRecoveredSensor,
 )
 
 
@@ -411,3 +413,255 @@ class TestGroupSummarySensor:
             mock_coordinator, "Test Group", "test_group", "test_entry_id"
         )
         assert sensor.unique_id == "test_entry_id_group_summary"
+
+
+class TestRecentlyOfflineSensor:
+    """Tests for RecentlyOfflineSensor."""
+
+    def test_native_value_none_when_no_recent_transitions(
+        self, mock_coordinator, mock_hass
+    ):
+        """Test 'None' string when no entity went offline recently."""
+        sensor = RecentlyOfflineSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
+        sensor.hass = mock_hass
+        assert sensor.native_value == "None"
+
+    def test_native_value_shows_friendly_name(self, mock_coordinator, mock_hass):
+        """Test friendly name shown when entity recently went offline."""
+        mock_coordinator._device_states[
+            "binary_sensor.device_b"
+        ].recently_offline_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+        sensor = RecentlyOfflineSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
+        sensor.hass = mock_hass
+        assert sensor.native_value == "Device B"
+
+    def test_native_value_excludes_expired_window(self, mock_coordinator, mock_hass):
+        """Test 'None' returned after window expires."""
+        mock_coordinator._device_states[
+            "binary_sensor.device_b"
+        ].recently_offline_at = datetime.now(timezone.utc) - timedelta(minutes=10)
+        sensor = RecentlyOfflineSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
+        sensor.hass = mock_hass
+        assert sensor.native_value == "None"
+
+    def test_native_value_excludes_suppressed(self, mock_coordinator, mock_hass):
+        """Test suppressed entities not shown."""
+        mock_coordinator._device_states[
+            "binary_sensor.device_b"
+        ].recently_offline_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+        mock_coordinator._device_states["binary_sensor.device_b"].is_suppressed = True
+        sensor = RecentlyOfflineSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
+        sensor.hass = mock_hass
+        assert sensor.native_value == "None"
+
+    def test_extra_state_attributes_contains_entity(self, mock_coordinator, mock_hass):
+        """Test attributes list recently offline entity ID."""
+        mock_coordinator._device_states[
+            "binary_sensor.device_b"
+        ].recently_offline_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+        sensor = RecentlyOfflineSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
+        sensor.hass = mock_hass
+        attrs = sensor.extra_state_attributes
+        assert "binary_sensor.device_b" in attrs["entities"]
+        assert attrs["count"] == 1
+        assert attrs["window_minutes"] == 5
+
+    def test_unique_id(self, mock_coordinator, mock_hass):
+        """Test unique_id format."""
+        sensor = RecentlyOfflineSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
+        assert sensor.unique_id == "test_entry_id_recently_offline"
+
+
+class TestRecentlyRecoveredSensor:
+    """Tests for RecentlyRecoveredSensor."""
+
+    def test_native_value_none_when_no_recent_recovery(
+        self, mock_coordinator, mock_hass
+    ):
+        """Test 'None' string when no entity recovered recently."""
+        sensor = RecentlyRecoveredSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
+        sensor.hass = mock_hass
+        assert sensor.native_value == "None"
+
+    def test_native_value_shows_friendly_name(self, mock_coordinator, mock_hass):
+        """Test friendly name shown when entity recently recovered."""
+        mock_coordinator._device_states["binary_sensor.device_a"].last_recovery = (
+            datetime.now(timezone.utc) - timedelta(minutes=2)
+        )
+        sensor = RecentlyRecoveredSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
+        sensor.hass = mock_hass
+        assert sensor.native_value == "Device A"
+
+    def test_native_value_excludes_expired_window(self, mock_coordinator, mock_hass):
+        """Test 'None' returned after window expires."""
+        mock_coordinator._device_states["binary_sensor.device_a"].last_recovery = (
+            datetime.now(timezone.utc) - timedelta(minutes=10)
+        )
+        sensor = RecentlyRecoveredSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
+        sensor.hass = mock_hass
+        assert sensor.native_value == "None"
+
+    def test_native_value_excludes_offline_devices(self, mock_coordinator, mock_hass):
+        """Test currently offline devices not shown even if last_recovery set."""
+        mock_coordinator._device_states["binary_sensor.device_b"].last_recovery = (
+            datetime.now(timezone.utc) - timedelta(minutes=1)
+        )
+        sensor = RecentlyRecoveredSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
+        sensor.hass = mock_hass
+        assert sensor.native_value == "None"
+
+    def test_extra_state_attributes_contains_entity(self, mock_coordinator, mock_hass):
+        """Test attributes list recently recovered entity ID."""
+        mock_coordinator._device_states["binary_sensor.device_a"].last_recovery = (
+            datetime.now(timezone.utc) - timedelta(minutes=2)
+        )
+        sensor = RecentlyRecoveredSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
+        sensor.hass = mock_hass
+        attrs = sensor.extra_state_attributes
+        assert "binary_sensor.device_a" in attrs["entities"]
+        assert attrs["count"] == 1
+        assert attrs["window_minutes"] == 5
+
+    def test_native_value_excludes_suppressed(self, mock_coordinator, mock_hass):
+        """Test suppressed entities not shown."""
+        mock_coordinator._device_states["binary_sensor.device_a"].last_recovery = (
+            datetime.now(timezone.utc) - timedelta(minutes=2)
+        )
+        mock_coordinator._device_states["binary_sensor.device_a"].is_suppressed = True
+        sensor = RecentlyRecoveredSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
+        sensor.hass = mock_hass
+        assert sensor.native_value == "None"
+
+    def test_unique_id(self, mock_coordinator, mock_hass):
+        """Test unique_id format."""
+        sensor = RecentlyRecoveredSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
+        assert sensor.unique_id == "test_entry_id_recently_recovered"
+
+    def test_native_value_at_exactly_window_boundary(self, mock_coordinator, mock_hass):
+        """Device recovered at exactly window_minutes*60 seconds ago should still show."""
+        # Pin a fixed 'now' so the boundary comparison doesn't drift
+        fixed_now = datetime(2026, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+        window_seconds = mock_coordinator.recovery_window_minutes * 60
+        mock_coordinator._device_states["binary_sensor.device_a"].last_recovery = (
+            fixed_now - timedelta(seconds=window_seconds)
+        )
+        sensor = RecentlyRecoveredSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
+        sensor.hass = mock_hass
+        with patch("custom_components.entity_availability.sensor.datetime") as mock_dt:
+            mock_dt.now.return_value = fixed_now
+            # At exactly the boundary (<=) the device should still appear
+            assert sensor.native_value == "Device A"
+
+    def test_native_value_truncation_of_long_list(self, mock_coordinator, mock_hass):
+        """Long list of recently recovered devices is truncated to MAX_STATE_LENGTH."""
+        now = datetime.now(timezone.utc) - timedelta(minutes=1)
+        # Add many online devices with recent recovery
+        for i in range(50):
+            entity_id = f"binary_sensor.recovered_{i:03d}"
+            mock_coordinator._device_states[entity_id] = DeviceState(
+                entity_id=entity_id,
+                is_offline=False,
+                last_recovery=now,
+            )
+            mock_hass.states.async_set(
+                entity_id,
+                "on",
+                {"friendly_name": f"Very Long Recovered Device Name {i:03d}"},
+            )
+
+        sensor = RecentlyRecoveredSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
+        sensor.hass = mock_hass
+        value = sensor.native_value
+        assert len(value) <= MAX_STATE_LENGTH
+        assert value.endswith("...")
+
+
+class TestRecentlyOfflineSensorBoundary:
+    """Boundary and truncation tests for RecentlyOfflineSensor."""
+
+    def test_native_value_at_exactly_window_boundary(self, mock_coordinator, mock_hass):
+        """Device went offline at exactly window_minutes*60 seconds ago should still show."""
+        # Pin a fixed 'now' so the boundary comparison doesn't drift
+        fixed_now = datetime(2026, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+        window_seconds = mock_coordinator.recovery_window_minutes * 60
+        mock_coordinator._device_states[
+            "binary_sensor.device_b"
+        ].recently_offline_at = fixed_now - timedelta(seconds=window_seconds)
+        sensor = RecentlyOfflineSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
+        sensor.hass = mock_hass
+        with patch("custom_components.entity_availability.sensor.datetime") as mock_dt:
+            mock_dt.now.return_value = fixed_now
+            # At exactly the boundary (<=) the device should still appear
+            assert sensor.native_value == "Device B"
+
+    def test_native_value_one_second_past_boundary_excluded(
+        self, mock_coordinator, mock_hass
+    ):
+        """Device that went offline one second past the window should not appear."""
+        window_seconds = mock_coordinator.recovery_window_minutes * 60
+        mock_coordinator._device_states[
+            "binary_sensor.device_b"
+        ].recently_offline_at = datetime.now(timezone.utc) - timedelta(
+            seconds=window_seconds + 1
+        )
+        sensor = RecentlyOfflineSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
+        sensor.hass = mock_hass
+        assert sensor.native_value == "None"
+
+    def test_native_value_truncation_of_long_list(self, mock_coordinator, mock_hass):
+        """Long list of recently offline devices is truncated to MAX_STATE_LENGTH."""
+        now = datetime.now(timezone.utc) - timedelta(minutes=1)
+        for i in range(50):
+            entity_id = f"binary_sensor.offline_{i:03d}"
+            mock_coordinator._device_states[entity_id] = DeviceState(
+                entity_id=entity_id,
+                is_offline=True,
+                recently_offline_at=now,
+            )
+            mock_hass.states.async_set(
+                entity_id,
+                "unavailable",
+                {"friendly_name": f"Very Long Offline Device Name {i:03d}"},
+            )
+
+        sensor = RecentlyOfflineSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
+        sensor.hass = mock_hass
+        value = sensor.native_value
+        assert len(value) <= MAX_STATE_LENGTH
+        assert value.endswith("...")

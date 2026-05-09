@@ -10,10 +10,11 @@ suppress:
         entity:
     group:
       name: Group
-      description: The group name to suppress. When provided without entity_id, all entities in the group are suppressed.
+      description: The group to suppress. When provided without entity_id, all entities in the group are suppressed.
       required: false
       selector:
-        text:
+        config_entry:
+          integration: entity_availability
     duration:
       name: Duration (minutes)
       description: How long to suppress monitoring (1-10080 minutes). Default 60.
@@ -24,6 +25,24 @@ suppress:
           min: 1
           max: 10080
           unit_of_measurement: minutes
+
+suppress_indefinitely:
+  name: Suppress entity indefinitely
+  description: Exclude an entity or entire group from availability monitoring with no expiry. Use the unsuppress action to resume monitoring.
+  fields:
+    entity_id:
+      name: Entity
+      description: The entity ID to suppress. Optional if group is provided.
+      required: false
+      selector:
+        entity:
+    group:
+      name: Group
+      description: The group to suppress. When provided without entity_id, all entities in the group are suppressed.
+      required: false
+      selector:
+        config_entry:
+          integration: entity_availability
 
 unsuppress:
   name: Unsuppress entity
@@ -37,7 +56,8 @@ unsuppress:
         entity:
     group:
       name: Group
-      description: The group name to unsuppress. When provided without entity_id, all entities in the group are unsuppressed.
+      description: The group to unsuppress. When provided without entity_id, all entities in the group are unsuppressed.
       required: false
       selector:
-        text:
+        config_entry:
+          integration: entity_availability

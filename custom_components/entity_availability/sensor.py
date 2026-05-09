@@ -52,6 +52,8 @@ async def async_setup_entry(
         OfflineCountSensor(coordinator, group_name, group_slug, entry.entry_id),
         OfflineDevicesSensor(coordinator, group_name, group_slug, entry.entry_id),
         GroupSummarySensor(coordinator, group_name, group_slug, entry.entry_id),
+        RecentlyOfflineSensor(coordinator, group_name, group_slug, entry.entry_id),
+        RecentlyRecoveredSensor(coordinator, group_name, group_slug, entry.entry_id),
     ]
 
     battery_threshold = entry.data.get(
@@ -413,4 +415,132 @@ class GroupSummarySensor(
                 for eid, d in states.items()
                 if d.offline_since is not None
             },
+        }
+
+
+class RecentlyOfflineSensor(
+    CoordinatorEntity[EntityAvailabilityCoordinator], SensorEntity
+):
+    """Sensor showing entities that went offline within the recovery window."""
+
+    _attr_icon = "mdi:lan-disconnect"
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        coordinator: EntityAvailabilityCoordinator,
+        group_name: str,
+        group_slug: str,
+        entry_id: str,
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{entry_id}_recently_offline"
+        self._attr_name = "Recently Offline"
+        self._attr_device_info = _device_info(entry_id, group_slug, group_name)
+
+    def _window_seconds(self) -> float:
+        return self.coordinator.recovery_window_minutes * 60
+
+    def _matching_devices(self):
+        now = datetime.now(timezone.utc)
+        cutoff = self._window_seconds()
+        return [
+            d
+            for d in self.coordinator.device_states.values()
+            if d.is_offline
+            and not d.is_suppressed
+            and d.recently_offline_at is not None
+            and (now - d.recently_offline_at).total_seconds() <= cutoff
+        ]
+
+    def _friendly_name(self, entity_id: str) -> str:
+        state = self.hass.states.get(entity_id)
+        if state and state.attributes.get("friendly_name"):
+            return state.attributes["friendly_name"]
+        return entity_id.split(".")[-1].replace("_", " ").title()
+
+    @property
+    def native_value(self) -> str:
+        """Return comma-separated friendly names of recently offline entities."""
+        devices = self._matching_devices()
+        if not devices:
+            return "None"
+        result = ", ".join(self._friendly_name(d.entity_id) for d in devices)
+        if len(result) > MAX_STATE_LENGTH - 3:
+            result = result[: MAX_STATE_LENGTH - 3] + "..."
+        return result
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return list of entity IDs that recently went offline."""
+        devices = self._matching_devices()
+        return {
+            "entities": [d.entity_id for d in devices],
+            "count": len(devices),
+            "window_minutes": self.coordinator.recovery_window_minutes,
+        }
+
+
+class RecentlyRecoveredSensor(
+    CoordinatorEntity[EntityAvailabilityCoordinator], SensorEntity
+):
+    """Sensor showing entities that recovered from offline within the recovery window."""
+
+    _attr_icon = "mdi:lan-connect"
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        coordinator: EntityAvailabilityCoordinator,
+        group_name: str,
+        group_slug: str,
+        entry_id: str,
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{entry_id}_recently_recovered"
+        self._attr_name = "Recently Recovered"
+        self._attr_device_info = _device_info(entry_id, group_slug, group_name)
+
+    def _window_seconds(self) -> float:
+        return self.coordinator.recovery_window_minutes * 60
+
+    def _matching_devices(self):
+        now = datetime.now(timezone.utc)
+        cutoff = self._window_seconds()
+        return [
+            d
+            for d in self.coordinator.device_states.values()
+            if not d.is_offline
+            and not d.is_suppressed
+            and d.last_recovery is not None
+            and (now - d.last_recovery).total_seconds() <= cutoff
+        ]
+
+    def _friendly_name(self, entity_id: str) -> str:
+        state = self.hass.states.get(entity_id)
+        if state and state.attributes.get("friendly_name"):
+            return state.attributes["friendly_name"]
+        return entity_id.split(".")[-1].replace("_", " ").title()
+
+    @property
+    def native_value(self) -> str:
+        """Return comma-separated friendly names of recently recovered entities."""
+        devices = self._matching_devices()
+        if not devices:
+            return "None"
+        result = ", ".join(self._friendly_name(d.entity_id) for d in devices)
+        if len(result) > MAX_STATE_LENGTH - 3:
+            result = result[: MAX_STATE_LENGTH - 3] + "..."
+        return result
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return list of entity IDs that recently recovered."""
+        devices = self._matching_devices()
+        return {
+            "entities": [d.entity_id for d in devices],
+            "count": len(devices),
+            "window_minutes": self.coordinator.recovery_window_minutes,
         }

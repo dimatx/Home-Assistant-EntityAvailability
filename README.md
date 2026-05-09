@@ -22,6 +22,8 @@ Monitor entity availability in Home Assistant. Track offline entities, availabil
 - **Availability % sensors** -- track uptime over today, 3-day, 5-day, and 7-day windows
 - **Battery monitoring** -- auto-detect or manually map battery entities; supports numeric (%) and text states (`low`)
 - **Degraded entity detection** -- flag entities with low battery or stale data
+- **Recently offline / recovered sensors** -- track which entities went offline or recovered within a configurable time window
+- **Indefinite suppression** -- suppress an entity with no expiry via `suppress_indefinitely`
 - **Maintenance/suppression mode** -- temporarily exclude entities from monitoring
 - **Custom Lovelace card** -- traffic-light status display with at-a-glance health overview
 - **Self-managed storage** -- no recorder dependency; data stored in `.storage`
@@ -87,6 +89,7 @@ Choose whether to monitor a group of entities or combine existing groups.
 |-------|---------|-------------|
 | Low battery threshold (%) | `20` | Battery level below which an entity is considered degraded (0 = disabled) |
 | Availability tracking windows | `today`, `7d` | Which time windows to create availability sensors for |
+| Recovery window (minutes) | `5` | How long entities remain visible in the recently-offline and recently-recovered sensors after the event |
 
 ![Step 4: Advanced Settings](custom_components/entity_availability/docs/03_advanced_settings.png)
 
@@ -131,6 +134,8 @@ For example, a group named "Security Devices" produces the slug `security_device
 |--------|------|-------|------------|
 | `sensor..._offline_count` | Sensor | Number of entities currently offline | Per-entity offline status, timestamps, recovery info |
 | `sensor..._offline_entities` | Sensor | Comma-separated list of offline entity names (`"None"` when all online) | Full entity list, count |
+| `sensor..._recently_offline` | Sensor | Comma-separated friendly names of entities that went offline within the recovery window (`"None"` when empty) | `entities` (list of entity IDs), `count`, `window_minutes` |
+| `sensor..._recently_recovered` | Sensor | Comma-separated friendly names of entities that recovered from offline within the recovery window (`"None"` when empty) | `entities` (list of entity IDs), `count`, `window_minutes` |
 | `sensor..._low_battery` | Sensor | Comma-separated list of low battery entities (`"None"` when all OK) | Per-entity battery levels, count |
 | `sensor..._low_battery_count` | Sensor | Number of entities with low battery | — |
 | `sensor..._group_summary` | Sensor | Total entity count in the group | total_entities, online, offline, suppressed, battery_powered, low_battery |
@@ -138,7 +143,7 @@ For example, a group named "Security Devices" produces the slug `security_device
 | `sensor..._availability_7d` | Sensor | Group availability % over 7 days | Per-entity availability breakdown |
 | `binary_sensor..._any_offline` | Binary Sensor (Problem) | ON when at least one entity is offline | offline_entities, offline_count |
 
-> **Note:** The Low Battery and Low Battery Count sensors are only created when battery threshold > 0. Availability window sensors are only created for windows selected during configuration.
+> **Note:** The Low Battery and Low Battery Count sensors are only created when battery threshold > 0. Availability window sensors are only created for windows selected during configuration. The recently-offline and recently-recovered sensors are always created regardless of battery threshold.
 
 ![Sensors](custom_components/entity_availability/docs/05_sensors.png)
 
@@ -175,6 +180,19 @@ When an entity comes back online, the `offline_count` sensor includes:
 
 - `last_recovery` -- timestamp of when the entity came back online
 - `last_downtime_seconds` -- how long the entity was offline (seconds)
+
+### Recently Offline / Recently Recovered Sensors
+
+These sensors keep a rolling record of activity within the configured recovery window (default 5 minutes). They are always created for every group, regardless of the battery threshold setting.
+
+| Sensor | State | Attributes |
+|--------|-------|------------|
+| `sensor..._recently_offline` | Comma-separated friendly names of entities that went offline within the window (`"None"` when empty) | `entities` (list of entity IDs), `count`, `window_minutes` |
+| `sensor..._recently_recovered` | Comma-separated friendly names of entities that recovered from offline within the window (`"None"` when empty) | `entities` (list of entity IDs), `count`, `window_minutes` |
+
+The window length is controlled by the **Recovery window** setting in Advanced Settings (Step 4) and can be changed at any time via the Options flow.
+
+Use these sensors in automations to get the exact device name(s) at the moment of an event — see the [Automation Ideas](#automation-ideas) section for examples.
 
 ---
 
@@ -261,6 +279,8 @@ data:
   duration: 60
 ```
 
+> **Group field:** In the Actions UI, the `group` field shows a dropdown of all Entity Availability config entries. In YAML automations you can use either the group name (e.g. `security_devices`) or the config entry ID — both are accepted.
+
 **Use case:** Suppress monitoring during planned maintenance, firmware updates, or known downtime.
 
 ![Suppress Entity Action](custom_components/entity_availability/docs/09_suppress_entity_action.png)
@@ -286,6 +306,26 @@ data:
 ![Unsuppress Entity Action](custom_components/entity_availability/docs/10_unsuppress_entity_action.png)
 
 ![Actions Overview](custom_components/entity_availability/docs/08_actions.png)
+
+### `entity_availability.suppress_indefinitely`
+
+Suppress an entity (or all entities in a group) with no expiry. The suppression remains active until explicitly cleared with `entity_availability.unsuppress`.
+
+```yaml
+# Suppress a single entity indefinitely
+service: entity_availability.suppress_indefinitely
+data:
+  entity_id: switch.garden_lights
+```
+
+```yaml
+# Suppress all entities in a group indefinitely
+service: entity_availability.suppress_indefinitely
+data:
+  group: security_devices
+```
+
+**Use case:** Decommissioned or long-term offline devices that you want to keep in the group without generating alerts. Because there is no expiry, remember to `unsuppress` when monitoring should resume.
 
 ---
 
@@ -324,6 +364,56 @@ automation:
           title: "All Entities Online"
           message: "All security devices are back online."
 ```
+
+### Notify which device just went offline
+
+Uses the `recently_offline` sensor's `entities` attribute to name the specific device at the moment it drops off.
+
+```yaml
+automation:
+  - alias: "Notify which device just went offline"
+    trigger:
+      - platform: state
+        entity_id: sensor.entity_availability_security_devices_recently_offline
+    condition:
+      - condition: template
+        value_template: "{{ trigger.to_state.state != 'None' and trigger.to_state.state != trigger.from_state.state }}"
+    action:
+      - service: notify.mobile_app
+        data:
+          title: "Device Went Offline"
+          message: >
+            {{ trigger.to_state.state }} went offline.
+```
+
+You can also read the raw entity ID list from the attribute:
+
+```yaml
+{{ state_attr('sensor.entity_availability_security_devices_recently_offline', 'entities') | join(', ') }}
+```
+
+### Notify which device just recovered
+
+Uses the `recently_recovered` sensor's `entities` attribute to confirm the specific device that came back online.
+
+```yaml
+automation:
+  - alias: "Notify which device just recovered"
+    trigger:
+      - platform: state
+        entity_id: sensor.entity_availability_security_devices_recently_recovered
+    condition:
+      - condition: template
+        value_template: "{{ trigger.to_state.state != 'None' and trigger.to_state.state != trigger.from_state.state }}"
+    action:
+      - service: notify.mobile_app
+        data:
+          title: "Device Recovered"
+          message: >
+            {{ trigger.to_state.state }} came back online.
+```
+
+> **Tip:** The `window_minutes` attribute on both sensors reflects the configured recovery window. Trigger on state changes of the sensor itself — any change means a new device joined or left the window.
 
 ### Trigger on every offline change (combined groups)
 

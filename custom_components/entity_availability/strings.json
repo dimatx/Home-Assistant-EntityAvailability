@@ -28,10 +28,12 @@
         "description": "Optional advanced monitoring features.",
         "data": {
           "battery_threshold": "Low battery threshold (%, 0 = disabled)",
-          "availability_windows": "Availability tracking windows"
+          "availability_windows": "Availability tracking windows",
+          "recovery_window": "Recovery window"
         },
         "data_description": {
-          "battery_threshold": "Flag entities whose battery falls below this percentage. The 'low' state is also automatically detected. Volt-based entities are not supported. Use entities that report battery as a percentage or support the 'low' state."
+          "battery_threshold": "Flag entities whose battery falls below this percentage. The 'low' state is also automatically detected. Volt-based entities are not supported. Use entities that report battery as a percentage or support the 'low' state.",
+          "recovery_window": "How long (in minutes) an entity stays in the Recently Offline or Recently Recovered sensors after a state transition."
         }
       },
       "battery_mapping": {
@@ -58,10 +60,12 @@
           "cooldown": "Cooldown (seconds)",
           "staleness_threshold": "Staleness threshold (minutes, 0 = disabled)",
           "battery_threshold": "Low battery threshold (%, 0 = disabled)",
-          "availability_windows": "Availability tracking windows"
+          "availability_windows": "Availability tracking windows",
+          "recovery_window": "Recovery window (minutes)"
         },
         "data_description": {
-          "battery_threshold": "Flag entities whose battery falls below this percentage. The 'low' state is also automatically detected. Volt-based entities are not supported. Use entities that report battery as a percentage or support the 'low' state."
+          "battery_threshold": "Flag entities whose battery falls below this percentage. The 'low' state is also automatically detected. Volt-based entities are not supported. Use entities that report battery as a percentage or support the 'low' state.",
+          "recovery_window": "How long (in minutes) an entity stays in the Recently Offline or Recently Recovered sensors after a state transition."
         }
       },
       "battery_mapping": {
@@ -86,6 +90,12 @@
       },
       "group_summary": {
         "name": "Group Summary"
+      },
+      "recently_offline": {
+        "name": "Recently Offline"
+      },
+      "recently_recovered": {
+        "name": "Recently Recovered"
       },
       "availability_today": {
         "name": "Availability (Today)"

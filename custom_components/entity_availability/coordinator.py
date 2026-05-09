@@ -23,10 +23,12 @@ from .const import (
     CONF_BATTERY_THRESHOLD,
     CONF_COOLDOWN,
     CONF_ENTITIES,
+    CONF_RECOVERY_WINDOW,
     CONF_STALENESS_THRESHOLD,
     DEFAULT_BAD_STATES,
     DEFAULT_BATTERY_THRESHOLD,
     DEFAULT_COOLDOWN,
+    DEFAULT_RECOVERY_WINDOW,
     DEFAULT_STALENESS_THRESHOLD,
     SCAN_INTERVAL,
     STARTUP_GRACE_PERIOD,
@@ -100,6 +102,11 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
         return self._availability_storage
 
     @property
+    def recovery_window_minutes(self) -> int:
+        """Return the recovery window in minutes, reading live from config."""
+        return self.entry.data.get(CONF_RECOVERY_WINDOW, DEFAULT_RECOVERY_WINDOW)
+
+    @property
     def group_name(self) -> str:
         """Return the group name."""
         return self.entry.title
@@ -149,7 +156,10 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
                 )
             if "suppressed" in stored:
                 for entity_id, until_str in stored["suppressed"].items():
-                    if until_str:
+                    if until_str is None:
+                        # Indefinite suppression — restore without expiry
+                        self._suppressed[entity_id] = None
+                    else:
                         try:
                             until = datetime.fromisoformat(until_str)
                             if until > datetime.now(timezone.utc):
@@ -176,6 +186,22 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
                         )
                     except (ValueError, TypeError):
                         device.cooldown_start = None
+                    try:
+                        raw = ds.get("recently_offline_at")
+                        if raw:
+                            ts = datetime.fromisoformat(raw)
+                            window_seconds = (
+                                self.entry.data.get(
+                                    CONF_RECOVERY_WINDOW, DEFAULT_RECOVERY_WINDOW
+                                )
+                                * 60
+                            )
+                            if (
+                                datetime.now(timezone.utc) - ts
+                            ).total_seconds() <= window_seconds:
+                                device.recently_offline_at = ts
+                    except (ValueError, TypeError):
+                        device.recently_offline_at = None
                     self._device_states[entity_id] = device
 
     async def _async_save_storage(self) -> None:
@@ -190,6 +216,9 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
                     else None,
                     "cooldown_start": device.cooldown_start.isoformat()
                     if device.cooldown_start
+                    else None,
+                    "recently_offline_at": device.recently_offline_at.isoformat()
+                    if device.recently_offline_at
                     else None,
                 }
         data = {
@@ -301,6 +330,7 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
                     if not device.is_offline and not in_grace:
                         device.is_offline = True
                         device.offline_since = device.cooldown_start
+                        device.recently_offline_at = now
                 else:
                     # Still in cooldown - record as online
                     self._availability_storage.record_online(entity_id, elapsed, now)
@@ -314,6 +344,7 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
                         ).total_seconds()
                     device.is_offline = False
                     device.offline_since = None
+                    device.recently_offline_at = None
                 device.cooldown_start = None
                 self._availability_storage.record_online(entity_id, elapsed, now)
 

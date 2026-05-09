@@ -38,3 +38,7 @@ SCAN_INTERVAL = 30  # seconds
 
 # Grace period after HA startup before new offline transitions are allowed
 STARTUP_GRACE_PERIOD = 60  # seconds
+
+# Recovery window for recently_recovered / recently_offline sensors
+CONF_RECOVERY_WINDOW = "recovery_window"
+DEFAULT_RECOVERY_WINDOW = 5  # minutes

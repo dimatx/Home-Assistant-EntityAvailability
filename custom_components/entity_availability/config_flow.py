@@ -28,11 +28,13 @@ from .const import (
     CONF_ENTITIES,
     CONF_ENTRY_TYPE,
     CONF_GROUP_NAME,
+    CONF_RECOVERY_WINDOW,
     CONF_STALENESS_THRESHOLD,
     DEFAULT_AVAILABILITY_WINDOWS,
     DEFAULT_BAD_STATES,
     DEFAULT_BATTERY_THRESHOLD,
     DEFAULT_COOLDOWN,
+    DEFAULT_RECOVERY_WINDOW,
     DEFAULT_STALENESS_THRESHOLD,
     DOMAIN,
     ENTRY_TYPE_COMBINED,
@@ -229,6 +231,7 @@ class EntityAvailabilityConfigFlow(ConfigFlow, domain=DOMAIN):
             self._data[CONF_AVAILABILITY_WINDOWS] = user_input[
                 CONF_AVAILABILITY_WINDOWS
             ]
+            self._data[CONF_RECOVERY_WINDOW] = user_input[CONF_RECOVERY_WINDOW]
 
             if self._data[CONF_BATTERY_THRESHOLD] > 0:
                 return await self.async_step_battery_mapping()
@@ -254,6 +257,13 @@ class EntityAvailabilityConfigFlow(ConfigFlow, domain=DOMAIN):
                     selector.SelectSelectorConfig(
                         options=AVAILABLE_WINDOWS,
                         multiple=True,
+                    )
+                ),
+                vol.Required(
+                    CONF_RECOVERY_WINDOW, default=DEFAULT_RECOVERY_WINDOW
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=1, max=60, step=1, unit_of_measurement="minutes"
                     )
                 ),
             }
@@ -404,6 +414,14 @@ class EntityAvailabilityOptionsFlow(OptionsFlow):
                     selector.SelectSelectorConfig(
                         options=AVAILABLE_WINDOWS,
                         multiple=True,
+                    )
+                ),
+                vol.Required(
+                    CONF_RECOVERY_WINDOW,
+                    default=current.get(CONF_RECOVERY_WINDOW, DEFAULT_RECOVERY_WINDOW),
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=1, max=60, step=1, unit_of_measurement="minutes"
                     )
                 ),
             }

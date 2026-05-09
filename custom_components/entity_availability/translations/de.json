@@ -43,11 +43,13 @@
         "description": "Optionale erweiterte Überwachungsfunktionen.",
         "data": {
           "battery_threshold": "Niedriger Batterieschwellenwert (%, 0 = deaktiviert)",
-          "availability_windows": "Verfügbarkeits-Tracking-Zeiträume"
+          "availability_windows": "Verfügbarkeits-Tracking-Zeiträume",
+          "recovery_window": "Wiederherstellungsfenster"
         },
         "data_description": {
           "battery_threshold": "Markiert Entitäten, deren Batterie unter diesen Prozentwert fällt. Der Zustand 'low' wird automatisch erkannt. Volt-basierte Entitäten werden nicht unterstützt.",
-          "availability_windows": "Zeitfenster zur Verfolgung der Gruppenverfügbarkeit (z. B. heute, 3d, 7d)."
+          "availability_windows": "Zeitfenster zur Verfolgung der Gruppenverfügbarkeit (z. B. heute, 3d, 7d).",
+          "recovery_window": "Wie lange (in Minuten) eine Entität nach einem Zustandswechsel in den Sensoren 'Kürzlich offline' oder 'Kürzlich wiederhergestellt' verbleibt."
         }
       },
       "battery_mapping": {
@@ -76,14 +78,16 @@
           "cooldown": "Abklingzeit (Sekunden)",
           "staleness_threshold": "Veralterungsschwelle (Minuten, 0 = deaktiviert)",
           "battery_threshold": "Niedriger Batterieschwellenwert (%, 0 = deaktiviert)",
-          "availability_windows": "Verfügbarkeits-Tracking-Zeiträume"
+          "availability_windows": "Verfügbarkeits-Tracking-Zeiträume",
+          "recovery_window": "Wiederherstellungsfenster (Minuten)"
         },
         "data_description": {
           "bad_states": "Entitätszustände, die anzeigen, dass eine Entität offline ist (z. B. unavailable, unknown).",
           "cooldown": "Wie lange (in Sekunden) eine Entität in einem schlechten Zustand bleiben muss, bevor sie als offline markiert wird. Verhindert Fehlalarme bei kurzen Verbindungsunterbrechungen.",
           "staleness_threshold": "Wenn eine Entität sich für diese Anzahl von Minuten nicht geändert hat, wird sie als beeinträchtigt markiert. Auf 0 setzen zum Deaktivieren.",
           "battery_threshold": "Markiert Entitäten, deren Batterie unter diesen Prozentwert fällt. Der Zustand 'low' wird automatisch erkannt. Volt-basierte Entitäten werden nicht unterstützt.",
-          "availability_windows": "Zeitfenster zur Verfolgung der Gruppenverfügbarkeit (z. B. heute, 3d, 7d)."
+          "availability_windows": "Zeitfenster zur Verfolgung der Gruppenverfügbarkeit (z. B. heute, 3d, 7d).",
+          "recovery_window": "Wie lange (in Minuten) eine Entität nach einem Zustandswechsel in den Sensoren 'Kürzlich offline' oder 'Kürzlich wiederhergestellt' verbleibt."
         }
       },
       "combined_init": {
@@ -116,6 +120,12 @@
       },
       "group_summary": {
         "name": "Gruppenzusammenfassung"
+      },
+      "recently_offline": {
+        "name": "Kürzlich offline"
+      },
+      "recently_recovered": {
+        "name": "Kürzlich wiederhergestellt"
       },
       "combined_summary": {
         "name": "Kombinierte Zusammenfassung"

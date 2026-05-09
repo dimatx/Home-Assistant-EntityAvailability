@@ -43,11 +43,13 @@
         "description": "Valgfrie avanserte overvåkingsfunksjoner.",
         "data": {
           "battery_threshold": "Grense for lavt batteri (%, 0 = deaktivert)",
-          "availability_windows": "Tilgjengelighetssporingsvinduer"
+          "availability_windows": "Tilgjengelighetssporingsvinduer",
+          "recovery_window": "Gjenopprettingsvindu"
         },
         "data_description": {
           "battery_threshold": "Markerer enheter hvis batteri faller under denne prosentandelen. Tilstanden 'low' oppdages også automatisk. Volt-baserte enheter støttes ikke. Bruk enheter som rapporterer batteri som prosent eller støtter tilstanden 'low'.",
-          "availability_windows": "Tidsvinduer for sporing av gruppens tilgjengelighetshistorikk (f.eks. i dag, 3d, 7d)."
+          "availability_windows": "Tidsvinduer for sporing av gruppens tilgjengelighetshistorikk (f.eks. i dag, 3d, 7d).",
+          "recovery_window": "Hvor lenge (i minutter) en entitet forblir i sensorene Nylig frakoblet eller Nylig gjenopprettet etter en tilstandsovergang."
         }
       },
       "battery_mapping": {
@@ -76,14 +78,16 @@
           "cooldown": "Ventetid (sekunder)",
           "staleness_threshold": "Inaktivitetsterskel (minutter, 0 = deaktivert)",
           "battery_threshold": "Grense for lavt batteri (%, 0 = deaktivert)",
-          "availability_windows": "Tilgjengelighetssporingsvinduer"
+          "availability_windows": "Tilgjengelighetssporingsvinduer",
+          "recovery_window": "Gjenopprettingsvindu (minutter)"
         },
         "data_description": {
           "bad_states": "Entitetstilstander som indikerer at en entitet er frakoblet (f.eks. unavailable, unknown).",
           "cooldown": "Hvor lenge (i sekunder) en enhet må være i en dårlig tilstand før den merkes som frakoblet. Forhindrer falske alarmer ved korte frakoblinger.",
           "staleness_threshold": "Hvis en enhet ikke har endret tilstand på dette antallet minutter, merkes den som forringet. Sett til 0 for å deaktivere.",
           "battery_threshold": "Markerer enheter hvis batteri faller under denne prosentandelen. Tilstanden 'low' oppdages også automatisk. Volt-baserte enheter støttes ikke.",
-          "availability_windows": "Tidsvinduer for sporing av gruppens tilgjengelighetshistorikk (f.eks. i dag, 3d, 7d)."
+          "availability_windows": "Tidsvinduer for sporing av gruppens tilgjengelighetshistorikk (f.eks. i dag, 3d, 7d).",
+          "recovery_window": "Hvor lenge (i minutter) en entitet forblir i sensorene Nylig frakoblet eller Nylig gjenopprettet etter en tilstandsovergang."
         }
       },
       "combined_init": {
@@ -116,6 +120,12 @@
       },
       "group_summary": {
         "name": "Gruppeoppsummering"
+      },
+      "recently_offline": {
+        "name": "Nylig frakoblet"
+      },
+      "recently_recovered": {
+        "name": "Nylig gjenopprettet"
       },
       "combined_summary": {
         "name": "Kombinert oppsummering"

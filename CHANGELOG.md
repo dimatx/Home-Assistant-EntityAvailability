@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0-beta.2] - 2026-05-09
+
+### Added
+- Sensor: `recently_offline` — tracks entities that went offline within a configurable window (default 5 minutes); state is the friendly name list, attribute `entities` is the entity ID list
+- Sensor: `recently_recovered` — tracks entities that recovered from offline within the same window; state is the friendly name list, attribute `entities` is the entity ID list
+- Config: `recovery_window` setting (minutes) in Advanced Settings and Options flow — controls how long entities remain visible in both sensors after a state transition
+- Action: `suppress_indefinitely` — suppress an entity or group with no expiry; cleared by the existing `unsuppress` action
+
+### Fixed
+- Indefinite suppressions (no expiry) now survive HA restarts
+- `recently_offline_at` timestamps are now persisted to storage and restored on restart, so entities that went offline before a restart correctly appear in the `recently_offline` sensor within the configured window
+- Changes to `recovery_window` in the Options flow now take effect immediately without requiring an integration reload
+
 ## [0.3.0-beta.1] - 2026-05-08
 
 ### Added

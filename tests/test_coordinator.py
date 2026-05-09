@@ -861,3 +861,242 @@ async def test_battery_map_falsy_returns_none(
         assert device_a.battery_level is None, (
             f"falsy map value {falsy_value!r} should produce battery_level=None"
         )
+
+
+# ---------------------------------------------------------------------------
+# Storage load/save — recently_offline_at persistence
+# ---------------------------------------------------------------------------
+
+
+async def test_load_storage_restores_recently_offline_at_within_window(
+    mock_hass: HomeAssistant, mock_config_entry
+) -> None:
+    """recently_offline_at is restored when the timestamp is within the recovery window."""
+    hass = mock_hass
+    recent_ts = datetime.now(timezone.utc) - timedelta(minutes=2)
+
+    stored_data = {
+        "availability": {},
+        "suppressed": {},
+        "device_states": {
+            "binary_sensor.device_a": {
+                "is_offline": True,
+                "offline_since": (
+                    datetime.now(timezone.utc) - timedelta(minutes=5)
+                ).isoformat(),
+                "cooldown_start": None,
+                "recently_offline_at": recent_ts.isoformat(),
+            }
+        },
+    }
+
+    coord = EntityAvailabilityCoordinator(hass, mock_config_entry)
+    coord._store = MagicMock()
+    coord._store.async_load = AsyncMock(return_value=stored_data)
+    coord._store.async_save = AsyncMock()
+
+    await coord._async_load_storage()
+
+    device = coord._device_states["binary_sensor.device_a"]
+    assert device.recently_offline_at is not None
+    # Should be within 1 second of the stored timestamp
+    diff = abs((device.recently_offline_at - recent_ts).total_seconds())
+    assert diff < 1
+
+
+async def test_load_storage_discards_recently_offline_at_outside_window(
+    mock_hass: HomeAssistant, mock_config_entry
+) -> None:
+    """recently_offline_at is discarded when the timestamp exceeds the recovery window."""
+    hass = mock_hass
+    # Timestamp is 10 minutes ago — outside the default 5-minute window
+    old_ts = datetime.now(timezone.utc) - timedelta(minutes=10)
+
+    stored_data = {
+        "availability": {},
+        "suppressed": {},
+        "device_states": {
+            "binary_sensor.device_a": {
+                "is_offline": True,
+                "offline_since": None,
+                "cooldown_start": None,
+                "recently_offline_at": old_ts.isoformat(),
+            }
+        },
+    }
+
+    coord = EntityAvailabilityCoordinator(hass, mock_config_entry)
+    coord._store = MagicMock()
+    coord._store.async_load = AsyncMock(return_value=stored_data)
+    coord._store.async_save = AsyncMock()
+
+    await coord._async_load_storage()
+
+    device = coord._device_states["binary_sensor.device_a"]
+    # Should be cleared because it is outside the window
+    assert device.recently_offline_at is None
+
+
+async def test_load_storage_ignores_bad_recently_offline_at_string(
+    mock_hass: HomeAssistant, mock_config_entry
+) -> None:
+    """Invalid ISO string for recently_offline_at is silently ignored."""
+    hass = mock_hass
+
+    stored_data = {
+        "availability": {},
+        "suppressed": {},
+        "device_states": {
+            "binary_sensor.device_a": {
+                "is_offline": False,
+                "offline_since": None,
+                "cooldown_start": None,
+                "recently_offline_at": "not-a-valid-iso-string",
+            }
+        },
+    }
+
+    coord = EntityAvailabilityCoordinator(hass, mock_config_entry)
+    coord._store = MagicMock()
+    coord._store.async_load = AsyncMock(return_value=stored_data)
+    coord._store.async_save = AsyncMock()
+
+    # Should not raise
+    await coord._async_load_storage()
+
+    device = coord._device_states["binary_sensor.device_a"]
+    assert device.recently_offline_at is None
+
+
+# ---------------------------------------------------------------------------
+# Storage load — indefinite suppression (until_str is None)
+# ---------------------------------------------------------------------------
+
+
+async def test_load_storage_restores_indefinite_suppression(
+    mock_hass: HomeAssistant, mock_config_entry
+) -> None:
+    """Indefinite suppression (until=None) is restored after a restart."""
+    hass = mock_hass
+
+    stored_data = {
+        "availability": {},
+        "suppressed": {
+            "binary_sensor.device_a": None,  # indefinite — no expiry
+        },
+        "device_states": {},
+    }
+
+    coord = EntityAvailabilityCoordinator(hass, mock_config_entry)
+    coord._store = MagicMock()
+    coord._store.async_load = AsyncMock(return_value=stored_data)
+    coord._store.async_save = AsyncMock()
+
+    await coord._async_load_storage()
+
+    # The entity must appear in _suppressed with None as the value
+    assert "binary_sensor.device_a" in coord._suppressed
+    assert coord._suppressed["binary_sensor.device_a"] is None
+
+
+async def test_load_storage_restores_indefinite_suppression_via_update(
+    mock_hass: HomeAssistant, mock_config_entry
+) -> None:
+    """After loading indefinite suppression, the device shows as suppressed on next update."""
+    hass = mock_hass
+    hass.states.async_set("binary_sensor.device_a", STATE_ON)
+
+    stored_data = {
+        "availability": {},
+        "suppressed": {
+            "binary_sensor.device_a": None,
+        },
+        "device_states": {},
+    }
+
+    with patch.object(
+        EntityAvailabilityCoordinator, "_async_save_storage", new_callable=AsyncMock
+    ):
+        coord = EntityAvailabilityCoordinator(hass, mock_config_entry)
+        coord._store = MagicMock()
+        coord._store.async_load = AsyncMock(return_value=stored_data)
+
+        await coord._async_load_storage()
+
+        coord._last_update = None
+        await coord._async_update_data()
+
+    device_a = coord.device_states["binary_sensor.device_a"]
+    assert device_a.is_suppressed is True
+    assert device_a.suppress_until is None
+
+
+# ---------------------------------------------------------------------------
+# recovery_window_minutes reads live from entry.data
+# ---------------------------------------------------------------------------
+
+
+async def test_recovery_window_minutes_reads_live_from_entry_data(
+    mock_hass: HomeAssistant, mock_config_data
+) -> None:
+    """recovery_window_minutes always reflects the current entry.data value."""
+    from custom_components.entity_availability.const import CONF_RECOVERY_WINDOW
+
+    hass = mock_hass
+    config = dict(mock_config_data)
+    config[CONF_RECOVERY_WINDOW] = 15
+
+    entry = MockConfigEntry(
+        version=1,
+        domain=DOMAIN,
+        title="Test Group",
+        data=config,
+        entry_id="test_entry_recovery",
+        unique_id=f"{DOMAIN}_test_recovery",
+    )
+    # Register the entry so async_update_entry can find it
+    entry.add_to_hass(hass)
+
+    with patch.object(
+        EntityAvailabilityCoordinator, "_async_save_storage", new_callable=AsyncMock
+    ):
+        coord = EntityAvailabilityCoordinator(hass, entry)
+
+    # Value set in config
+    assert coord.recovery_window_minutes == 15
+
+    # Simulate live update to entry.data (e.g., options flow)
+    new_data = dict(entry.data)
+    new_data[CONF_RECOVERY_WINDOW] = 30
+    hass.config_entries.async_update_entry(entry, data=new_data)
+
+    # Property reads from entry.data directly — no stale cache
+    assert coord.recovery_window_minutes == 30
+
+
+async def test_recovery_window_minutes_uses_default_when_absent(
+    mock_hass: HomeAssistant, mock_config_data
+) -> None:
+    """recovery_window_minutes falls back to DEFAULT_RECOVERY_WINDOW when key absent."""
+    from custom_components.entity_availability.const import DEFAULT_RECOVERY_WINDOW
+
+    hass = mock_hass
+    # config without CONF_RECOVERY_WINDOW key
+    config = dict(mock_config_data)
+    config.pop("recovery_window", None)
+
+    entry = MockConfigEntry(
+        version=1,
+        domain=DOMAIN,
+        title="Test Group",
+        data=config,
+        entry_id="test_entry_recovery_default",
+        unique_id=f"{DOMAIN}_test_recovery_default",
+    )
+
+    with patch.object(
+        EntityAvailabilityCoordinator, "_async_save_storage", new_callable=AsyncMock
+    ):
+        coord = EntityAvailabilityCoordinator(hass, entry)
+
+    assert coord.recovery_window_minutes == DEFAULT_RECOVERY_WINDOW

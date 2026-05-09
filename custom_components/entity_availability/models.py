@@ -24,6 +24,7 @@ class DeviceState:
     cooldown_start: datetime | None = None
     battery_level: int | None = None
     last_changed: datetime | None = None
+    recently_offline_at: datetime | None = None
 
 
 @dataclass

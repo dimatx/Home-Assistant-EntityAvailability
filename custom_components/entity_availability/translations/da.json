@@ -43,11 +43,13 @@
         "description": "Valgfrie avancerede overvågningsfunktioner.",
         "data": {
           "battery_threshold": "Grænse for lavt batteri (%, 0 = deaktiveret)",
-          "availability_windows": "Tilgængelighedssporingsvinduer"
+          "availability_windows": "Tilgængelighedssporingsvinduer",
+          "recovery_window": "Genoprettelsesvindue"
         },
         "data_description": {
           "battery_threshold": "Markerer entiteter, hvis batteri falder under denne procentdel. Tilstanden 'low' registreres også automatisk. Volt-baserede entiteter understøttes ikke. Brug entiteter, der rapporterer batteri som procent eller understøtter tilstanden 'low'.",
-          "availability_windows": "Tidsvinduer til sporing af gruppens tilgængelighed (f.eks. i dag, 3d, 7d)."
+          "availability_windows": "Tidsvinduer til sporing af gruppens tilgængelighed (f.eks. i dag, 3d, 7d).",
+          "recovery_window": "Hvor længe (i minutter) en entitet forbliver i sensorerne Senest offline eller Senest genoprettet efter et tilstandsskift."
         }
       },
       "battery_mapping": {
@@ -76,14 +78,16 @@
           "cooldown": "Ventetid (sekunder)",
           "staleness_threshold": "Inaktivitetstærskel (minutter, 0 = deaktiveret)",
           "battery_threshold": "Grænse for lavt batteri (%, 0 = deaktiveret)",
-          "availability_windows": "Tilgængelighedssporingsvinduer"
+          "availability_windows": "Tilgængelighedssporingsvinduer",
+          "recovery_window": "Genoprettelsesvindue (minutter)"
         },
         "data_description": {
           "bad_states": "Entitetstilstande, der indikerer, at en entitet er offline (f.eks. unavailable, unknown).",
           "cooldown": "Hvor længe (i sekunder) en entitet skal forblive i en fejltilstand, før den markeres som offline. Forhindrer falske alarmer ved korte afbrydelser.",
           "staleness_threshold": "Hvis en entitet ikke har skiftet tilstand i dette antal minutter, markeres den som forringet. Sæt til 0 for at deaktivere.",
           "battery_threshold": "Markér entiteter, hvis batteri falder under denne procentdel. Tilstanden 'low' registreres også automatisk. Volt-baserede entiteter understøttes ikke.",
-          "availability_windows": "Tidsvinduer til sporing af gruppens tilgængelighed (f.eks. i dag, 3d, 7d)."
+          "availability_windows": "Tidsvinduer til sporing af gruppens tilgængelighed (f.eks. i dag, 3d, 7d).",
+          "recovery_window": "Hvor længe (i minutter) en entitet forbliver i sensorerne Senest offline eller Senest genoprettet efter et tilstandsskift."
         }
       },
       "combined_init": {
@@ -116,6 +120,12 @@
       },
       "group_summary": {
         "name": "Gruppeoversigt"
+      },
+      "recently_offline": {
+        "name": "Senest offline"
+      },
+      "recently_recovered": {
+        "name": "Senest genoprettet"
       },
       "combined_summary": {
         "name": "Kombineret oversigt"
