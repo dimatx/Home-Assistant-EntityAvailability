@@ -132,7 +132,7 @@ For example, a group named "Security Devices" produces the slug `security_device
 
 | Entity | Type | State | Attributes |
 |--------|------|-------|------------|
-| `sensor..._offline_count` | Sensor | Number of entities currently offline | Per-entity offline status, timestamps, recovery info |
+| `sensor..._offline_count` | Sensor | Number of entities currently offline | Per-entity dict keyed by entity ID: `offline` (bool), `since` (ISO timestamp or null), `last_recovery` (ISO timestamp or null), `last_downtime_seconds` (float or null) |
 | `sensor..._offline_entities` | Sensor | Comma-separated list of offline entity names (`"None"` when all online) | Full entity list, count |
 | `sensor..._recently_offline` | Sensor | Comma-separated friendly names of entities that went offline within the recovery window (`"None"` when empty) | `entities` (list of entity IDs), `count`, `window_minutes` |
 | `sensor..._recently_recovered` | Sensor | Comma-separated friendly names of entities that recovered from offline within the recovery window (`"None"` when empty) | `entities` (list of entity IDs), `count`, `window_minutes` |
@@ -210,10 +210,10 @@ For example, a combined group named "All Devices" produces the slug `all_devices
 
 | Entity | Type | State | Notes |
 |--------|------|-------|-------|
-| `sensor..._combined_summary` | Sensor | Total offline count across all source groups | Attributes: `total_entities`, `online`, `offline`, `stale`, `low_battery`, `suppressed`, `battery_powered`, `groups`, `offline_entities`, `low_battery_entities`. The `groups` attribute is a dict keyed by group name: `{group_name: {total, online, offline, stale, low_battery, suppressed, battery_powered}}` |
+| `sensor..._combined_summary` | Sensor | Total offline count across all source groups | Attributes: `total_entities`, `online`, `offline`, `stale`, `low_battery`, `suppressed`, `battery_powered`, `groups`, `offline_entities`, `low_battery_entities`. The `groups` attribute is a dict keyed by group name: `{group_name: {total, online, offline, stale, low_battery, suppressed, battery_powered}}`. `missing_groups` (list of entry IDs) is present when one or more source groups are not loaded. |
 | `sensor..._offline_entities` | Sensor | Comma-separated names of offline entities (`"None"` when all online) | Attributes: `entities` (list of entity IDs), `count` |
-| `sensor..._recently_offline` | Sensor | Comma-separated friendly names of entities that went offline within each source group's recovery window (`"None"` when empty) | `entities` (list of entity IDs), `count` |
-| `sensor..._recently_recovered` | Sensor | Comma-separated friendly names of entities that recovered within each source group's recovery window (`"None"` when empty) | `entities` (list of entity IDs), `count` |
+| `sensor..._recently_offline` | Sensor | Comma-separated friendly names of entities that went offline within each source group's recovery window (`"None"` when empty) | `entities` (list of entity IDs), `count` — no `window_minutes` (each source group uses its own configured window) |
+| `sensor..._recently_recovered` | Sensor | Comma-separated friendly names of entities that recovered within each source group's recovery window (`"None"` when empty) | `entities` (list of entity IDs), `count` — no `window_minutes` |
 | `sensor..._low_battery` | Sensor | Comma-separated names of low battery entities (`"None"` when all OK) | Attributes: `devices` (dict of entity ID → battery level), `count` |
 | `sensor..._low_battery_count` | Sensor | Number of entities with low battery across all groups | — |
 | `binary_sensor..._any_offline` | Binary Sensor (Problem) | ON when any entity across all groups is offline | Attributes: `offline_entities`, `offline_count` |
