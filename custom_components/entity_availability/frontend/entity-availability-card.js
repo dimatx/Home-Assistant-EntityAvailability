@@ -797,6 +797,16 @@ class EntityAvailabilityCard extends LitElement {
     const entries = Object.entries(groups);
     if (entries.length === 0) return nothing;
 
+    const sortBy = this._config.group_sort_by || "name_asc";
+    entries.sort(([nameA, gA], [nameB, gB]) => {
+      if (sortBy === "name_desc") return nameB.localeCompare(nameA);
+      if (sortBy === "offline_desc") {
+        const diff = (gB.offline ?? 0) - (gA.offline ?? 0);
+        return diff !== 0 ? diff : nameA.localeCompare(nameB);
+      }
+      return nameA.localeCompare(nameB);
+    });
+
     const expanded = this._entitiesExpanded;
 
     return html`
@@ -1348,6 +1358,19 @@ class EntityAvailabilityCardEditor extends LitElement {
             Compact Mode
           </label>
         </div>
+        ${this._isSelectedGroupCombined() ? html`
+        <div class="editor-row">
+          <label>Sort Groups By</label>
+          <select
+            .value=${this._config.group_sort_by || "name_asc"}
+            @change=${(e) => this._updateConfig("group_sort_by", e.target.value)}
+          >
+            <option value="name_asc">Name A → Z (default)</option>
+            <option value="name_desc">Name Z → A</option>
+            <option value="offline_desc">Offline ↓ (most issues first)</option>
+          </select>
+        </div>
+        ` : nothing}
         ${!this._isSelectedGroupCombined() ? html`
         <div class="editor-row">
           <label>Entity Detail</label>

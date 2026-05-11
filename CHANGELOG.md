@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- Card: `group_sort_by` option for combined group cards — sort the group breakdown table by `name_asc` (default), `name_desc`, or `offline_desc` (most offline first, ties broken by name)
+- Card editor: **Sort Groups By** dropdown shown when a combined group is selected; replaces the entity sort controls that are not applicable to combined groups
+
 ## [0.3.0-beta.4] - 2026-05-11
 
 ### Fixed

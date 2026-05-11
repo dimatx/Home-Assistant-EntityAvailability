@@ -224,8 +224,6 @@ The `recently_offline` and `recently_recovered` sensors use each source group's 
 
 ![Combined Group Sensors](custom_components/entity_availability/docs/05b_combined_sensors.png)
 
-<!-- screenshot: combined sensors visible in Developer Tools → States -->
-
 ### Example Automation
 
 Alert when anything across your entire home goes offline:
@@ -632,6 +630,7 @@ compact: false
 entity_detail: "off"
 entity_filter: "all"
 sort_by: status
+group_sort_by: name_asc
 availability_thresholds:
   high: 99
   mid: 95
@@ -653,6 +652,7 @@ availability_colors:
 | `entity_filter` | `"all"` | Filter entity list: `"all"`, `"offline"` (problems only: offline/stale/low battery), `"online"` (healthy only). Section title and count update to reflect filter (e.g., "Offline Entities (2/6)"). (regular groups only) |
 | `compact` | `false` | Reduced padding mode |
 | `sort_by` | `status` | Entity list sort order: `status`, `name_asc`, `name_desc`, `battery_asc`, `battery_desc` (regular groups only) |
+| `group_sort_by` | `name_asc` | Group breakdown table sort order: `name_asc`, `name_desc`, `offline_desc` (most offline first). (combined groups only) |
 | `availability_thresholds` | `{high: 99, mid: 95}` | % thresholds for bar colors (regular groups only) |
 | `availability_colors` | `{high, mid, low}` | Custom hex colors for bars (regular groups only) |
 
@@ -673,7 +673,7 @@ The card editor includes a **Group Slug** dropdown populated from all discovered
 - **Groups** — regular monitored groups
 - **Combined Groups** — aggregated combined groups
 
-Selecting a combined group hides editor controls that don't apply (availability bars, entity filter, entity detail, sort order, suppress buttons, color thresholds), leaving only the options relevant to combined group display.
+Selecting a combined group hides editor controls that don't apply (availability bars, entity filter, entity detail, entity sort order, suppress buttons, color thresholds), and shows the **Sort Groups By** dropdown instead.
 
 ### Card Preview — Regular Group
 
