@@ -1100,3 +1100,118 @@ async def test_recovery_window_minutes_uses_default_when_absent(
         coord = EntityAvailabilityCoordinator(hass, entry)
 
     assert coord.recovery_window_minutes == DEFAULT_RECOVERY_WINDOW
+
+
+# ---------------------------------------------------------------------------
+# Storage load/save — stale entity pruning after group edit
+# ---------------------------------------------------------------------------
+
+
+async def test_load_storage_skips_removed_entities(
+    mock_hass: HomeAssistant, mock_config_entry
+) -> None:
+    """Entities removed from config are not restored from storage."""
+    hass = mock_hass
+
+    # Storage contains device_a (in config) and device_removed (no longer in config)
+    stored_data = {
+        "availability": {},
+        "suppressed": {},
+        "device_states": {
+            "binary_sensor.device_a": {
+                "is_offline": True,
+                "offline_since": (
+                    datetime.now(timezone.utc) - timedelta(minutes=5)
+                ).isoformat(),
+                "cooldown_start": None,
+                "recently_offline_at": None,
+            },
+            "binary_sensor.device_removed": {
+                "is_offline": True,
+                "offline_since": (
+                    datetime.now(timezone.utc) - timedelta(minutes=5)
+                ).isoformat(),
+                "cooldown_start": None,
+                "recently_offline_at": None,
+            },
+        },
+    }
+
+    coord = EntityAvailabilityCoordinator(hass, mock_config_entry)
+    coord._store = MagicMock()
+    coord._store.async_load = AsyncMock(return_value=stored_data)
+    coord._store.async_save = AsyncMock()
+
+    await coord._async_load_storage()
+
+    assert "binary_sensor.device_a" in coord._device_states
+    assert "binary_sensor.device_removed" not in coord._device_states
+
+
+async def test_save_storage_skips_removed_entities(
+    mock_hass: HomeAssistant, mock_config_entry
+) -> None:
+    """Entities not in current config are excluded from saved storage."""
+    from custom_components.entity_availability.models import DeviceState
+
+    hass = mock_hass
+
+    coord = EntityAvailabilityCoordinator(hass, mock_config_entry)
+    coord._store = MagicMock()
+    coord._store.async_load = AsyncMock(return_value=None)
+    coord._store.async_save = AsyncMock()
+
+    # Inject a stale entity into device_states (simulates pre-fix state)
+    stale = DeviceState(entity_id="binary_sensor.device_removed")
+    stale.is_offline = True
+    coord._device_states["binary_sensor.device_removed"] = stale
+
+    await coord._async_save_storage()
+
+    saved = coord._store.async_save.call_args[0][0]
+    assert "binary_sensor.device_removed" not in saved["device_states"]
+
+
+async def test_load_storage_skips_suppression_for_removed_entities(
+    mock_hass: HomeAssistant, mock_config_entry
+) -> None:
+    """Suppression entries for entities no longer in config are not restored."""
+    hass = mock_hass
+
+    stored_data = {
+        "availability": {},
+        "suppressed": {
+            "binary_sensor.device_a": None,
+            "binary_sensor.device_removed": None,
+        },
+        "device_states": {},
+    }
+
+    coord = EntityAvailabilityCoordinator(hass, mock_config_entry)
+    coord._store = MagicMock()
+    coord._store.async_load = AsyncMock(return_value=stored_data)
+    coord._store.async_save = AsyncMock()
+
+    await coord._async_load_storage()
+
+    assert "binary_sensor.device_a" in coord._suppressed
+    assert "binary_sensor.device_removed" not in coord._suppressed
+
+
+async def test_save_storage_skips_suppression_for_removed_entities(
+    mock_hass: HomeAssistant, mock_config_entry
+) -> None:
+    """Suppression entries for entities not in current config are excluded from save."""
+    hass = mock_hass
+
+    coord = EntityAvailabilityCoordinator(hass, mock_config_entry)
+    coord._store = MagicMock()
+    coord._store.async_load = AsyncMock(return_value=None)
+    coord._store.async_save = AsyncMock()
+
+    coord._suppressed["binary_sensor.device_removed"] = None
+
+    await coord._async_save_storage()
+
+    saved = coord._store.async_save.call_args[0][0]
+    assert "binary_sensor.device_removed" not in saved["suppressed"]

@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0-beta.4] - 2026-05-11
+
+### Fixed
+- Entities removed from a group no longer persist in storage after editing the group — stale device states and suppression entries are now pruned on load and save
+- Re-adding a previously suppressed entity to a group now starts without inherited suppression state
+
 ## [0.3.0-beta.3] - 2026-05-09
 
 ### Added

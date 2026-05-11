@@ -156,6 +156,8 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
                 )
             if "suppressed" in stored:
                 for entity_id, until_str in stored["suppressed"].items():
+                    if entity_id not in self._entities:
+                        continue
                     if until_str is None:
                         # Indefinite suppression — restore without expiry
                         self._suppressed[entity_id] = None
@@ -202,12 +204,15 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
                                 device.recently_offline_at = ts
                     except (ValueError, TypeError):
                         device.recently_offline_at = None
-                    self._device_states[entity_id] = device
+                    if entity_id in self._entities:
+                        self._device_states[entity_id] = device
 
     async def _async_save_storage(self) -> None:
         """Persist availability data."""
         device_states_data: dict[str, dict] = {}
         for entity_id, device in self._device_states.items():
+            if entity_id not in self._entities:
+                continue
             if device.is_offline or device.cooldown_start is not None:
                 device_states_data[entity_id] = {
                     "is_offline": device.is_offline,
@@ -226,6 +231,7 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
             "suppressed": {
                 entity_id: until.isoformat() if until else None
                 for entity_id, until in self._suppressed.items()
+                if entity_id in self._entities
             },
             "device_states": device_states_data,
         }
