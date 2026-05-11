@@ -113,9 +113,10 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
 
     def suppress_entity(self, entity_id: str, until: datetime | None = None) -> None:
         """Suppress alerts for an entity."""
-        if entity_id in self._device_states:
-            self._device_states[entity_id].is_suppressed = True
-            self._device_states[entity_id].suppress_until = until
+        if entity_id not in self._device_states:
+            self._device_states[entity_id] = DeviceState(entity_id=entity_id)
+        self._device_states[entity_id].is_suppressed = True
+        self._device_states[entity_id].suppress_until = until
         self._suppressed[entity_id] = until
         self._dirty = True
 
@@ -294,7 +295,7 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
 
             # Check suppression expiry
             if device.is_suppressed and device.suppress_until:
-                if now >= device.suppress_until:
+                if now > device.suppress_until:
                     device.is_suppressed = False
                     device.suppress_until = None
                     self._suppressed.pop(entity_id, None)
