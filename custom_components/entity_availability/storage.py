@@ -53,9 +53,18 @@ class AvailabilityStorage:
 
         bucket = AvailabilityBucket(interval_start=interval_start)
         buckets.append(bucket)
+        _LOGGER.debug(
+            "New bucket for %s at %s (total=%d)",
+            entity_id,
+            interval_start,
+            len(buckets),
+        )
 
         while len(buckets) > BUCKETS_MAX:
             buckets.pop(0)
+            _LOGGER.debug(
+                "Pruned oldest bucket for %s (now %d)", entity_id, len(buckets)
+            )
 
         return bucket
 
@@ -91,12 +100,25 @@ class AvailabilityStorage:
         ]
 
         if not relevant_buckets:
+            _LOGGER.debug(
+                "No buckets in window '%s' for %s (cutoff=%s)",
+                window,
+                entity_id,
+                cutoff,
+            )
             return None
 
         # Require at least 1 bucket for "today", 10% for longer windows
         expected_buckets = window_hours * 12  # 12 buckets per hour
         min_required = 1 if window == "today" else max(1, int(expected_buckets * 0.1))
         if len(relevant_buckets) < min_required:
+            _LOGGER.debug(
+                "Insufficient data for %s window '%s': have %d buckets, need %d",
+                entity_id,
+                window,
+                len(relevant_buckets),
+                min_required,
+            )
             return None
 
         total_online = sum(b.online_seconds for b in relevant_buckets)

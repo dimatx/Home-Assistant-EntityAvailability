@@ -48,6 +48,13 @@ async def async_setup_entry(
     group_slug = group_name.lower().replace(" ", "_")
     windows = entry.data.get(CONF_AVAILABILITY_WINDOWS, DEFAULT_AVAILABILITY_WINDOWS)
 
+    _LOGGER.debug(
+        "Setting up sensors for group '%s': windows=%s, entities=%d",
+        group_name,
+        windows,
+        len(coordinator.monitored_entities),
+    )
+
     entities: list[SensorEntity] = [
         OfflineCountSensor(coordinator, group_name, group_slug, entry.entry_id),
         OfflineDevicesSensor(coordinator, group_name, group_slug, entry.entry_id),
@@ -60,6 +67,11 @@ async def async_setup_entry(
         CONF_BATTERY_THRESHOLD, DEFAULT_BATTERY_THRESHOLD
     )
     if battery_threshold > 0:
+        _LOGGER.debug(
+            "Battery monitoring enabled for group '%s': threshold=%d%%",
+            group_name,
+            battery_threshold,
+        )
         entities.append(
             DegradedDevicesSensor(coordinator, group_name, group_slug, entry.entry_id)
         )

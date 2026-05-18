@@ -113,6 +113,7 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
 
     def suppress_entity(self, entity_id: str, until: datetime | None = None) -> None:
         """Suppress alerts for an entity."""
+        _LOGGER.debug("[%s] Suppressing %s until %s", self.group_name, entity_id, until)
         if entity_id not in self._device_states:
             self._device_states[entity_id] = DeviceState(entity_id=entity_id)
         self._device_states[entity_id].is_suppressed = True
@@ -122,6 +123,7 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
 
     def unsuppress_entity(self, entity_id: str) -> None:
         """Resume monitoring for an entity."""
+        _LOGGER.debug("[%s] Unsuppressing %s", self.group_name, entity_id)
         if entity_id in self._device_states:
             self._device_states[entity_id].is_suppressed = False
             self._device_states[entity_id].suppress_until = None
@@ -130,13 +132,24 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
 
     async def async_config_entry_first_refresh(self) -> None:
         """Load stored data and do first refresh."""
+        _LOGGER.debug(
+            "[%s] First refresh: loading storage, entities=%s",
+            self.group_name,
+            self._entities,
+        )
         await self._async_load_storage()
         self._startup_time = datetime.now(timezone.utc)
+        _LOGGER.debug(
+            "[%s] Startup grace period active until %s",
+            self.group_name,
+            self._startup_time + timedelta(seconds=STARTUP_GRACE_PERIOD),
+        )
         await super().async_config_entry_first_refresh()
         self._setup_state_listeners()
 
     async def async_shutdown(self) -> None:
         """Clean up on unload."""
+        _LOGGER.debug("[%s] Shutting down coordinator", self.group_name)
         if self._unsub_state_change is not None:
             self._unsub_state_change()
             self._unsub_state_change = None
@@ -145,12 +158,20 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
             self._debounce_cancel = None
         # Final save
         if self._dirty:
+            _LOGGER.debug("[%s] Saving dirty storage on shutdown", self.group_name)
             await self._async_save_storage()
 
     async def _async_load_storage(self) -> None:
         """Load persisted availability data."""
         stored = await self._store.async_load()
         if stored and isinstance(stored, dict):
+            _LOGGER.debug(
+                "[%s] Loading storage: %d availability entries, %d suppressed, %d device states",
+                self.group_name,
+                len(stored.get("availability", {})),
+                len(stored.get("suppressed", {})),
+                len(stored.get("device_states", {})),
+            )
             if "availability" in stored:
                 self._availability_storage = AvailabilityStorage.from_dict(
                     stored["availability"]
@@ -167,6 +188,12 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
                             until = datetime.fromisoformat(until_str)
                             if until > datetime.now(timezone.utc):
                                 self._suppressed[entity_id] = until
+                                _LOGGER.debug(
+                                    "[%s] Restored timed suppression for %s until %s",
+                                    self.group_name,
+                                    entity_id,
+                                    until,
+                                )
                         except (ValueError, TypeError):
                             pass
             if "device_states" in stored:
@@ -236,6 +263,13 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
             },
             "device_states": device_states_data,
         }
+        _LOGGER.debug(
+            "[%s] Saving storage: %d availability entries, %d suppressed, %d offline device states",
+            self.group_name,
+            len(data["availability"]),
+            len(data["suppressed"]),
+            len(device_states_data),
+        )
         await self._store.async_save(data)
         self._dirty = False
 
@@ -245,6 +279,11 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
         if self._unsub_state_change is not None:
             self._unsub_state_change()
 
+        _LOGGER.debug(
+            "[%s] Setting up state listeners for %d entities",
+            self.group_name,
+            len(self._entities),
+        )
         self._unsub_state_change = async_track_state_change_event(
             self.hass, self._entities, self._handle_state_change
         )
@@ -252,6 +291,16 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
     @callback
     def _handle_state_change(self, event: Event) -> None:
         """Handle state change for a monitored entity (debounced)."""
+        entity_id = event.data.get("entity_id", "unknown")
+        new_state = event.data.get("new_state")
+        old_state = event.data.get("old_state")
+        _LOGGER.debug(
+            "[%s] State change: %s  %s -> %s",
+            self.group_name,
+            entity_id,
+            old_state.state if old_state else "None",
+            new_state.state if new_state else "None",
+        )
         # Cancel any pending debounce timer
         if self._debounce_cancel is not None:
             self._debounce_cancel()
@@ -296,12 +345,21 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
             # Check suppression expiry
             if device.is_suppressed and device.suppress_until:
                 if now > device.suppress_until:
+                    _LOGGER.debug(
+                        "[%s] Suppression expired for %s", self.group_name, entity_id
+                    )
                     device.is_suppressed = False
                     device.suppress_until = None
                     self._suppressed.pop(entity_id, None)
 
             # Skip suppressed devices for availability tracking
             if device.is_suppressed:
+                _LOGGER.debug(
+                    "[%s] Skipping suppressed entity %s (until=%s)",
+                    self.group_name,
+                    entity_id,
+                    device.suppress_until,
+                )
                 continue
 
             # Determine if device is in a bad state
@@ -321,12 +379,25 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
                 age = (now - state.last_changed).total_seconds() / 60
                 if age > self._staleness_threshold:
                     is_stale = True
+                    _LOGGER.debug(
+                        "[%s] %s is stale: last changed %.1f min ago (threshold=%d min)",
+                        self.group_name,
+                        entity_id,
+                        age,
+                        self._staleness_threshold,
+                    )
                 device.last_changed = state.last_changed
 
             # Cooldown logic
             if is_bad:
                 if device.cooldown_start is None:
                     device.cooldown_start = now
+                    _LOGGER.debug(
+                        "[%s] %s entered bad state (%s), cooldown started",
+                        self.group_name,
+                        entity_id,
+                        state.state if state else "unavailable",
+                    )
                 cooldown_elapsed = (now - device.cooldown_start).total_seconds()
                 in_grace = (
                     self._startup_time is not None
@@ -335,15 +406,44 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
                 )
                 if cooldown_elapsed >= self._cooldown:
                     if not device.is_offline and not in_grace:
+                        _LOGGER.debug(
+                            "[%s] %s went OFFLINE (cooldown=%.0fs elapsed, since=%s)",
+                            self.group_name,
+                            entity_id,
+                            cooldown_elapsed,
+                            device.cooldown_start,
+                        )
                         device.is_offline = True
                         device.offline_since = device.cooldown_start
                         device.recently_offline_at = now
+                    elif in_grace:
+                        _LOGGER.debug(
+                            "[%s] %s cooldown elapsed but still in startup grace period",
+                            self.group_name,
+                            entity_id,
+                        )
                 else:
                     # Still in cooldown - record as online
+                    _LOGGER.debug(
+                        "[%s] %s in cooldown: %.0fs / %ds elapsed",
+                        self.group_name,
+                        entity_id,
+                        cooldown_elapsed,
+                        self._cooldown,
+                    )
                     self._availability_storage.record_online(entity_id, elapsed, now)
             else:
                 # Device is online
                 if device.is_offline:
+                    _LOGGER.debug(
+                        "[%s] %s RECOVERED (was offline since %s, downtime=%.0fs)",
+                        self.group_name,
+                        entity_id,
+                        device.offline_since,
+                        (now - device.offline_since).total_seconds()
+                        if device.offline_since
+                        else 0,
+                    )
                     device.last_recovery = now
                     if device.offline_since:
                         device.last_downtime_seconds = (
@@ -385,7 +485,15 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
                 return None
             bat_state = self.hass.states.get(mapped)
             if bat_state and bat_state.state not in ("unavailable", "unknown", None):
-                return self._parse_battery_state(bat_state.state)
+                level = self._parse_battery_state(bat_state.state)
+                _LOGGER.debug(
+                    "[%s] Battery for %s via map->%s: %s%%",
+                    self.group_name,
+                    entity_id,
+                    mapped,
+                    level,
+                )
+                return level
             return None
 
         # Auto-detection fallback: no map or entity not in map
@@ -395,10 +503,23 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
                 "battery"
             )
             if battery is not None:
-                return self._parse_battery_state(str(battery).replace("%", ""))
+                level = self._parse_battery_state(str(battery).replace("%", ""))
+                _LOGGER.debug(
+                    "[%s] Battery for %s via attribute: %s%%",
+                    self.group_name,
+                    entity_id,
+                    level,
+                )
+                return level
 
         battery_from_registry = self._get_battery_from_device_registry(entity_id)
         if battery_from_registry is not None:
+            _LOGGER.debug(
+                "[%s] Battery for %s via device registry: %s%%",
+                self.group_name,
+                entity_id,
+                battery_from_registry,
+            )
             return battery_from_registry
 
         parts = entity_id.split(".", 1)
@@ -406,7 +527,15 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
             battery_entity = f"sensor.{parts[1]}_battery"
             bat_state = self.hass.states.get(battery_entity)
             if bat_state and bat_state.state not in ("unavailable", "unknown", None):
-                return self._parse_battery_state(bat_state.state)
+                level = self._parse_battery_state(bat_state.state)
+                _LOGGER.debug(
+                    "[%s] Battery for %s via guessed entity %s: %s%%",
+                    self.group_name,
+                    entity_id,
+                    battery_entity,
+                    level,
+                )
+                return level
 
         return None
 
