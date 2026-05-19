@@ -1,9 +1,9 @@
 /**
- * Entity Availability Card v0.3.0
+ * Entity Availability Card v0.3.1
  * Custom Lovelace card for the Home Assistant Entity Availability integration.
  */
 
-const CARD_VERSION = "0.3.0";
+const CARD_VERSION = "0.3.1";
 
 console.info(
   `%c ENTITY-AVAILABILITY-CARD %c v${CARD_VERSION} %c — github.com/italo-lombardi `,
@@ -21,36 +21,38 @@ window.customCards.push({
   documentationURL: "https://github.com/italo-lombardi/Home-Assistant-EntityAvailability",
 });
 
-customElements.whenDefined("ha-panel-lovelace").then(() => {
-  if (customElements.get("entity-availability-card")) return;
-  const haPanel = customElements.get("ha-panel-lovelace");
-  if (!haPanel) return;
-  const LitElement = Object.getPrototypeOf(haPanel);
-  const { html, nothing } = LitElement.prototype;
-
-  const css = LitElement.prototype.css || (() => {
-    class CSSResult {
-      constructor(cssText) {
-        this.cssText = cssText;
-        this._styleSheet = null;
-      }
-      get styleSheet() {
-        if (this._styleSheet === null && window.CSSStyleSheet) {
-          try {
-            this._styleSheet = new CSSStyleSheet();
-            this._styleSheet.replaceSync(this.cssText);
-          } catch (e) {
-            this._styleSheet = null;
-          }
-        }
-        return this._styleSheet;
-      }
-      toString() { return this.cssText; }
+// Canonical no-build LitElement bootstrap — matches thomasloven/lovelace-card-tools pattern.
+// home-assistant-main and hui-view are in HA's initial bundle; always defined before card JS runs.
+// Synchronous get() avoids the iOS WKWebView timing issues caused by whenDefined("ha-panel-lovelace")
+// (ha-panel-lovelace is lazy-loaded and may resolve late or not at all on the Companion App).
+const LitElement = Object.getPrototypeOf(
+  customElements.get("home-assistant-main") || customElements.get("hui-view")
+);
+const html = LitElement.prototype.html;
+const nothing = LitElement.prototype.nothing ?? "";
+const css = LitElement.prototype.css || (() => {
+  class CSSResult {
+    constructor(cssText) {
+      this.cssText = cssText;
+      this._styleSheet = null;
     }
-    return (strings, ...values) => new CSSResult(
-      strings.reduce((acc, str, i) => acc + str + (values[i] != null ? String(values[i]) : ""), "")
-    );
-  })();
+    get styleSheet() {
+      if (this._styleSheet === null && window.CSSStyleSheet) {
+        try {
+          this._styleSheet = new CSSStyleSheet();
+          this._styleSheet.replaceSync(this.cssText);
+        } catch (e) {
+          this._styleSheet = null;
+        }
+      }
+      return this._styleSheet;
+    }
+    toString() { return this.cssText; }
+  }
+  return (strings, ...values) => new CSSResult(
+    strings.reduce((acc, str, i) => acc + str + (values[i] != null ? String(values[i]) : ""), "")
+  );
+})();
 
 const AVAILABILITY_WINDOWS = [
   { key: "today", label: "Today" },
@@ -1475,4 +1477,3 @@ class EntityAvailabilityCardEditor extends LitElement {
 
 customElements.define("entity-availability-card-editor", EntityAvailabilityCardEditor);
 
-}); // end customElements.whenDefined

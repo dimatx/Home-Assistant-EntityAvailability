@@ -723,6 +723,9 @@ Selecting a combined group hides editor controls that don't apply (availability 
 
 ## FAQ
 
+**Q: The card shows "configuration error" on the iOS Companion App but works in a browser. What's wrong?**
+A: Two things can cause this. First, try **Settings → Companion App → Debug → Reset frontend cache** in the iOS app — WKWebView caches JS aggressively and a stale copy of the card can break after a HA update. Second, if resetting the cache doesn't help, update to v0.3.1 or later, which replaced the card's element bootstrap with a more reliable approach that works with the iOS WebView's load order.
+
 **Q: Does this integration require the Recorder component?**
 A: No. Entity Availability uses its own `.storage` file for tracking history. This keeps your database lean.
 

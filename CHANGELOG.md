@@ -4,10 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-05-19
+
 ### Added
 - Card: `group_sort_by` option for combined group cards — sort the group breakdown table by `name_asc` (default), `name_desc`, or `offline_desc` (most offline first, ties broken by name)
 - Card editor: **Sort Groups By** dropdown shown when a combined group is selected; replaces the entity sort controls that are not applicable to combined groups
 - Debug logging across coordinator, sensor setup, and storage — enable with `logger: logs: custom_components.entity_availability: debug` in HA configuration; logs cover state transitions, cooldown/offline/recovery events, suppression changes, battery detection source, storage load/save, and availability bucket lifecycle
+
+### Fixed
+- Card: fixed iOS Companion App "configuration error" — replaced `customElements.whenDefined("ha-panel-lovelace")` (lazy-loaded, may not fire on iOS WKWebView) with a multi-element bootstrap that tries `home-assistant-main` first (always in HA's initial bundle), falling back to `ha-panel-lovelace` and `hui-view`; also tries element registration immediately if any anchor element is already defined
+- Card: `html`/`nothing`/`css` are now sourced from both the constructor and prototype to handle variation across HA bundle builds
 
 ## [0.3.0-beta.4] - 2026-05-11
 
