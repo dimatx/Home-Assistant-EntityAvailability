@@ -62,6 +62,9 @@ class CombinedGroupAnyOfflineBinarySensor(BinarySensorEntity):
         self._coordinators = coordinators
         self._combined_entry_ids = combined_entry_ids
         self._attr_unique_id = f"{entry.entry_id}_combined_any_offline"
+        self.entity_id = (
+            f"binary_sensor.entity_availability_combined_{group_slug}_any_offline"
+        )
         self._attr_name = "Any Offline"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry.entry_id)},

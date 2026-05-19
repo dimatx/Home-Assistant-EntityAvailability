@@ -118,6 +118,7 @@ class OfflineCountSensor(
         """Initialize the sensor."""
         super().__init__(coordinator)
         self._attr_unique_id = f"{entry_id}_offline_count"
+        self.entity_id = f"sensor.entity_availability_{group_slug}_offline_count"
         self._attr_name = "Offline Count"
         self._attr_device_info = _device_info(entry_id, group_slug, group_name)
 
@@ -165,6 +166,7 @@ class OfflineDevicesSensor(
         """Initialize the sensor."""
         super().__init__(coordinator)
         self._attr_unique_id = f"{entry_id}_offline_entities"
+        self.entity_id = f"sensor.entity_availability_{group_slug}_offline_entities"
         self._attr_name = "Offline Entities"
         self._attr_device_info = _device_info(entry_id, group_slug, group_name)
 
@@ -219,6 +221,7 @@ class DegradedDevicesSensor(
         """Initialize the sensor."""
         super().__init__(coordinator)
         self._attr_unique_id = f"{entry_id}_low_battery"
+        self.entity_id = f"sensor.entity_availability_{group_slug}_low_battery"
         self._attr_name = "Low Battery"
         self._attr_device_info = _device_info(entry_id, group_slug, group_name)
 
@@ -275,6 +278,7 @@ class LowBatteryCountSensor(
         """Initialize the sensor."""
         super().__init__(coordinator)
         self._attr_unique_id = f"{entry_id}_low_battery_count"
+        self.entity_id = f"sensor.entity_availability_{group_slug}_low_battery_count"
         self._attr_name = "Low Battery Count"
         self._attr_device_info = _device_info(entry_id, group_slug, group_name)
 
@@ -310,6 +314,9 @@ class AvailabilitySensor(
         super().__init__(coordinator)
         self._window = window
         self._attr_unique_id = f"{entry_id}_availability_{window}"
+        self.entity_id = (
+            f"sensor.entity_availability_{group_slug}_availability_{window}"
+        )
         self._attr_name = f"Availability ({window})"
         self._attr_device_info = _device_info(entry_id, group_slug, group_name)
 
@@ -368,6 +375,7 @@ class GroupSummarySensor(
         """Initialize the sensor."""
         super().__init__(coordinator)
         self._attr_unique_id = f"{entry_id}_group_summary"
+        self.entity_id = f"sensor.entity_availability_{group_slug}_group_summary"
         self._attr_name = "Group Summary"
         self._attr_device_info = _device_info(entry_id, group_slug, group_name)
 
@@ -448,6 +456,7 @@ class RecentlyOfflineSensor(
         """Initialize the sensor."""
         super().__init__(coordinator)
         self._attr_unique_id = f"{entry_id}_recently_offline"
+        self.entity_id = f"sensor.entity_availability_{group_slug}_recently_offline"
         self._attr_name = "Recently Offline"
         self._attr_device_info = _device_info(entry_id, group_slug, group_name)
 
@@ -512,6 +521,7 @@ class RecentlyRecoveredSensor(
         """Initialize the sensor."""
         super().__init__(coordinator)
         self._attr_unique_id = f"{entry_id}_recently_recovered"
+        self.entity_id = f"sensor.entity_availability_{group_slug}_recently_recovered"
         self._attr_name = "Recently Recovered"
         self._attr_device_info = _device_info(entry_id, group_slug, group_name)
 

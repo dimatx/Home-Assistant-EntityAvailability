@@ -96,6 +96,7 @@ class CombinedSensorBase(SensorEntity):
     ) -> None:
         self.hass = hass
         self._entry = entry
+        self._group_slug = group_slug
         self._coordinators = coordinators
         self._combined_entry_ids = combined_entry_ids
         self._attr_device_info = _device_info(entry.entry_id, group_name)
@@ -134,6 +135,9 @@ class CombinedGroupSensor(CombinedSensorBase):
             hass, entry, group_name, group_slug, coordinators, combined_entry_ids
         )
         self._attr_unique_id = f"{entry.entry_id}_combined_summary"
+        self.entity_id = (
+            f"sensor.entity_availability_combined_{self._group_slug}_combined_summary"
+        )
         self._attr_name = "Combined Summary"
 
     @property
@@ -239,6 +243,9 @@ class CombinedOfflineEntitiesSensor(CombinedSensorBase):
             hass, entry, group_name, group_slug, coordinators, combined_entry_ids
         )
         self._attr_unique_id = f"{entry.entry_id}_combined_offline_entities"
+        self.entity_id = (
+            f"sensor.entity_availability_combined_{self._group_slug}_offline_entities"
+        )
         self._attr_name = "Offline Entities"
 
     @property
@@ -281,6 +288,9 @@ class CombinedLowBatterySensor(CombinedSensorBase):
             hass, entry, group_name, group_slug, coordinators, combined_entry_ids
         )
         self._attr_unique_id = f"{entry.entry_id}_combined_low_battery"
+        self.entity_id = (
+            f"sensor.entity_availability_combined_{self._group_slug}_low_battery"
+        )
         self._attr_name = "Low Battery"
 
     @property
@@ -324,6 +334,9 @@ class CombinedLowBatteryCountSensor(CombinedSensorBase):
             hass, entry, group_name, group_slug, coordinators, combined_entry_ids
         )
         self._attr_unique_id = f"{entry.entry_id}_combined_low_battery_count"
+        self.entity_id = (
+            f"sensor.entity_availability_combined_{self._group_slug}_low_battery_count"
+        )
         self._attr_name = "Low Battery Count"
 
     @property
@@ -349,6 +362,9 @@ class CombinedRecentlyOfflineSensor(CombinedSensorBase):
             hass, entry, group_name, group_slug, coordinators, combined_entry_ids
         )
         self._attr_unique_id = f"{entry.entry_id}_combined_recently_offline"
+        self.entity_id = (
+            f"sensor.entity_availability_combined_{self._group_slug}_recently_offline"
+        )
         self._attr_name = "Recently Offline"
 
     def _matching_devices(self):
@@ -397,6 +413,9 @@ class CombinedRecentlyRecoveredSensor(CombinedSensorBase):
             hass, entry, group_name, group_slug, coordinators, combined_entry_ids
         )
         self._attr_unique_id = f"{entry.entry_id}_combined_recently_recovered"
+        self.entity_id = (
+            f"sensor.entity_availability_combined_{self._group_slug}_recently_recovered"
+        )
         self._attr_name = "Recently Recovered"
 
     def _matching_devices(self):
