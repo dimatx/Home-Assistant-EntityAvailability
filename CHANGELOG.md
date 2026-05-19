@@ -4,11 +4,6 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-## [0.3.1-beta.2] - 2026-05-19
-
-### Fixed
-- Card editor: group dropdown was empty when the config entry was renamed to remove the "Entity Availability" prefix — sensors now register with stable `entity_availability_` prefixed entity IDs regardless of entry title, so the card can always discover them; **note:** existing installs with custom entry names will have their sensor entity IDs renamed on the next reload
-
 ## [0.3.1] - 2026-05-19
 
 ### Added
@@ -19,7 +14,7 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 - Card: fixed iOS Companion App "configuration error" — replaced `customElements.whenDefined("ha-panel-lovelace")` (lazy-loaded, may not fire on iOS WKWebView) with a multi-element bootstrap that tries `home-assistant-main` first (always in HA's initial bundle), falling back to `ha-panel-lovelace` and `hui-view`; also tries element registration immediately if any anchor element is already defined
 - Card: `html`/`nothing`/`css` are now sourced from both the constructor and prototype to handle variation across HA bundle builds
-- Card editor: group dropdown was empty when the config entry was renamed to remove the "Entity Availability" prefix — sensors now register with stable `entity_availability_` prefixed entity IDs regardless of entry title, so the card can always discover them; **note:** existing installs with custom entry names will have their sensor entity IDs renamed on the next reload
+- Card editor: group dropdown was empty when the config entry was renamed to remove the "Entity Availability" prefix — sensors now register with stable `entity_availability_` prefixed entity IDs regardless of entry title, so the card can always discover them; **note:** applies to new installs only — existing installs with already-renamed entries need to delete and re-add the integration to get stable IDs
 
 ## [0.3.0-beta.4] - 2026-05-11
 
