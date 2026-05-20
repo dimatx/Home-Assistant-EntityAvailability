@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.3.2-beta.1] - 2026-05-20
+
+### Fixed
+- Card: `entity_detail` inline/tooltip now shows `unit_of_measurement` alongside the HA state value (e.g. `85 %` instead of `85` for battery sensors)
+- Coordinator: entities with `device_class: battery` now use their own state as the battery level, so mobile companion app battery sensors are correctly tracked and displayed in the card
+- Coordinator: `offline_since` now reflects `state.last_changed` when the entity was already in a bad state before the coordinator first polled it — offline duration shown in the card is accurate after HA restarts
+
+## [0.3.2] - 2026-05-20
+
+### Fixed
+- Card: `entity_detail` inline/tooltip now shows `unit_of_measurement` alongside the HA state value (e.g. `85 %` instead of `85` for battery sensors)
+- Coordinator: entities with `device_class: battery` now use their own state as the battery level, so mobile companion app battery sensors are correctly tracked and displayed in the card
+- Coordinator: `offline_since` now reflects `state.last_changed` when the entity was already in a bad state before the coordinator first polled it — offline duration shown in the card is accurate after HA restarts
+
 ## [0.3.1] - 2026-05-19
 
 ### Added

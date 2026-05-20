@@ -1,5 +1,5 @@
 /**
- * Entity Availability Card v0.3.1
+ * Entity Availability Card v0.3.2
  * Custom Lovelace card for the Home Assistant Entity Availability integration.
  */
 
@@ -944,7 +944,7 @@ class EntityAvailabilityCard extends LitElement {
     return [
       { label: "Entity ID", value: item.entityId },
       areaName ? { label: "Area", value: areaName } : null,
-      { label: "HA State", value: lastChanged ? `${this._formatIsoState(entityState.state)} · ${lastChanged}` : this._formatIsoState(entityState?.state || "unknown") },
+      { label: "HA State", value: lastChanged ? `${this._formatStateWithUnit(entityState)} · ${lastChanged}` : this._formatStateWithUnit(entityState) },
       { label: "Condition", value: suppressedUntil ? "Suppressed" : item.isOffline ? `Offline for ${item.status}` : item.status },
       item.battery !== null ? { label: "Battery", value: `${item.battery}%` } : null,
       suppressedUntil ? { label: "Suppressed", value: `until ${suppressedUntil}` } : null,
@@ -974,8 +974,8 @@ class EntityAvailabilityCard extends LitElement {
         ? this._computeDuration(item.entityId)
         : null;
       const haStateValue = lastChanged
-        ? `${this._formatIsoState(entityState.state)} · ${lastChanged}`
-        : this._formatIsoState(entityState?.state || "unknown");
+        ? `${this._formatStateWithUnit(entityState)} · ${lastChanged}`
+        : this._formatStateWithUnit(entityState);
       rows = [{ label: "HA State", value: haStateValue }];
     } else {
       rows = this._buildDetailRows(item, suppressedUntilMap);
@@ -1068,6 +1068,13 @@ class EntityAvailabilityCard extends LitElement {
       day: "numeric",
       ...(sameYear ? {} : { year: "numeric" }),
     });
+  }
+
+  _formatStateWithUnit(entityState) {
+    if (!entityState) return "unknown";
+    const formatted = this._formatIsoState(entityState.state);
+    const unit = entityState.attributes?.unit_of_measurement;
+    return unit ? `${formatted} ${unit}` : formatted;
   }
 
   _formatIsoState(stateValue) {

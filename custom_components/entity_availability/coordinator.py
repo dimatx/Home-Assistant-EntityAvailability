@@ -391,7 +391,11 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
             # Cooldown logic
             if is_bad:
                 if device.cooldown_start is None:
-                    device.cooldown_start = now
+                    device.cooldown_start = (
+                        state.last_changed
+                        if state and state.last_changed and state.last_changed < now
+                        else now
+                    )
                     _LOGGER.debug(
                         "[%s] %s entered bad state (%s), cooldown started",
                         self.group_name,
@@ -478,6 +482,21 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
 
     def _get_battery_level(self, entity_id: str) -> int | None:
         """Get battery level for an entity using configured mapping or auto-detection."""
+        state = self.hass.states.get(entity_id)
+        if (
+            state
+            and state.attributes.get("device_class") == "battery"
+            and state.state not in ("unavailable", "unknown", None)
+        ):
+            level = self._parse_battery_state(state.state)
+            _LOGGER.debug(
+                "[%s] Battery for %s via own state (device_class=battery): %s%%",
+                self.group_name,
+                entity_id,
+                level,
+            )
+            return level
+
         battery_map = self.entry.data.get(CONF_BATTERY_ENTITY_MAP)
         if battery_map is not None and entity_id in battery_map:
             mapped = battery_map[entity_id]

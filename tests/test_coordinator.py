@@ -1215,3 +1215,109 @@ async def test_save_storage_skips_suppression_for_removed_entities(
 
     saved = coord._store.async_save.call_args[0][0]
     assert "binary_sensor.device_removed" not in saved["suppressed"]
+
+
+# ---------------------------------------------------------------------------
+# Battery detection — device_class=battery entity reads own state
+# ---------------------------------------------------------------------------
+
+
+async def test_battery_detection_from_own_state_device_class(
+    mock_hass: HomeAssistant, mock_config_entry
+) -> None:
+    """Entity with device_class=battery uses its own state as battery level."""
+    hass = mock_hass
+    hass.states.async_set(
+        "binary_sensor.device_a",
+        "72",
+        {"friendly_name": "Phone Battery", "device_class": "battery"},
+    )
+
+    with patch.object(
+        EntityAvailabilityCoordinator, "_async_save_storage", new_callable=AsyncMock
+    ):
+        coord = EntityAvailabilityCoordinator(hass, mock_config_entry)
+        coord._last_update = None
+        await coord._async_update_data()
+
+    device_a = coord.device_states["binary_sensor.device_a"]
+    assert device_a.battery_level == 72
+
+
+async def test_battery_detection_device_class_takes_priority_over_map(
+    mock_hass: HomeAssistant, mock_config_data
+) -> None:
+    """device_class=battery own-state detection takes priority over battery map."""
+    hass = mock_hass
+    hass.states.async_set(
+        "binary_sensor.device_a",
+        "55",
+        {"friendly_name": "Phone Battery", "device_class": "battery"},
+    )
+    hass.states.async_set("sensor.some_other_battery", "10")
+
+    config = dict(mock_config_data)
+    config[CONF_BATTERY_ENTITY_MAP] = {
+        "binary_sensor.device_a": "sensor.some_other_battery"
+    }
+    entry = MockConfigEntry(
+        version=1,
+        domain=DOMAIN,
+        title="Test Group",
+        data=config,
+        entry_id="test_entry_dc_priority",
+        unique_id=f"{DOMAIN}_test_dc_priority",
+    )
+
+    with patch.object(
+        EntityAvailabilityCoordinator, "_async_save_storage", new_callable=AsyncMock
+    ):
+        coord = EntityAvailabilityCoordinator(hass, entry)
+        coord._last_update = None
+        await coord._async_update_data()
+
+    device_a = coord.device_states["binary_sensor.device_a"]
+    assert device_a.battery_level == 55
+
+
+# ---------------------------------------------------------------------------
+# Offline duration — cooldown_start uses state.last_changed
+# ---------------------------------------------------------------------------
+
+
+async def test_cooldown_start_uses_last_changed_when_earlier(
+    mock_hass: HomeAssistant, mock_config_entry
+) -> None:
+    """cooldown_start is set to state.last_changed when entity was already offline before coordinator first saw it."""
+    hass = mock_hass
+    earlier = datetime.now(timezone.utc) - timedelta(hours=3)
+
+    # Simulate entity that went unavailable 3 hours ago
+    state = State(
+        "binary_sensor.device_a",
+        STATE_UNAVAILABLE,
+        attributes={"friendly_name": "Device A"},
+        last_changed=earlier,
+        last_updated=earlier,
+    )
+    hass.states.async_set(
+        "binary_sensor.device_a",
+        STATE_UNAVAILABLE,
+        {"friendly_name": "Device A"},
+    )
+    # Directly inject the state with backdated last_changed
+    hass.states._states["binary_sensor.device_a"] = state
+
+    with patch.object(
+        EntityAvailabilityCoordinator, "_async_save_storage", new_callable=AsyncMock
+    ):
+        coord = EntityAvailabilityCoordinator(hass, mock_config_entry)
+        coord._startup_time = datetime.now(timezone.utc) - timedelta(
+            seconds=STARTUP_GRACE_PERIOD + 10
+        )
+        coord._last_update = None
+        await coord._async_update_data()
+
+    device_a = coord.device_states["binary_sensor.device_a"]
+    assert device_a.cooldown_start is not None
+    assert device_a.cooldown_start == earlier
