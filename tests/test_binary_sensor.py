@@ -8,7 +8,19 @@ import pytest
 
 from homeassistant.core import HomeAssistant
 
-from custom_components.entity_availability.binary_sensor import AnyOfflineBinarySensor
+from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+from custom_components.entity_availability.binary_sensor import (
+    AnyOfflineBinarySensor,
+    async_setup_entry,
+)
+from custom_components.entity_availability.const import (
+    CONF_COMBINED_GROUPS,
+    CONF_ENTRY_TYPE,
+    CONF_GROUP_NAME,
+    DOMAIN,
+    ENTRY_TYPE_COMBINED,
+)
 from custom_components.entity_availability.coordinator import (
     EntityAvailabilityCoordinator,
 )
@@ -132,3 +144,61 @@ class TestAnyOfflineBinarySensor:
         assert attrs["offline_count"] == 1
         assert "binary_sensor.device_a" not in attrs["offline_entities"]
         assert "binary_sensor.device_b" in attrs["offline_entities"]
+
+
+# ---------------------------------------------------------------------------
+# async_setup_entry — group path (lines 27-41)
+# ---------------------------------------------------------------------------
+
+
+async def test_binary_sensor_setup_entry_group_path(
+    mock_hass: HomeAssistant, mock_config_entry
+) -> None:
+    """async_setup_entry for a regular (group) entry creates AnyOfflineBinarySensor."""
+    hass = mock_hass
+    mock_config_entry.add_to_hass(hass)
+    hass.data.setdefault(DOMAIN, {})
+
+    with patch.object(
+        EntityAvailabilityCoordinator, "_async_save_storage", new_callable=AsyncMock
+    ):
+        coord = EntityAvailabilityCoordinator(hass, mock_config_entry)
+    hass.data[DOMAIN][mock_config_entry.entry_id] = coord
+
+    added = []
+
+    def capture(entities):
+        added.extend(entities)
+
+    await async_setup_entry(hass, mock_config_entry, capture)
+
+    assert len(added) == 1
+    assert isinstance(added[0], AnyOfflineBinarySensor)
+
+
+async def test_binary_sensor_setup_entry_combined_path(
+    mock_hass: HomeAssistant,
+) -> None:
+    """async_setup_entry for a combined entry delegates to combined_binary_sensor."""
+    hass = mock_hass
+    combined_entry = MockConfigEntry(
+        version=1,
+        domain=DOMAIN,
+        title="My Combined",
+        data={
+            CONF_ENTRY_TYPE: ENTRY_TYPE_COMBINED,
+            CONF_GROUP_NAME: "My Combined",
+            CONF_COMBINED_GROUPS: [],
+        },
+        entry_id="combined_bs_id",
+        unique_id=f"{DOMAIN}_combined_my_combined_bs",
+    )
+    combined_entry.add_to_hass(hass)
+    hass.data.setdefault(DOMAIN, {})
+
+    with patch(
+        "custom_components.entity_availability.combined_binary_sensor.async_setup_entry",
+        new_callable=AsyncMock,
+    ) as mock_combined:
+        await async_setup_entry(hass, combined_entry, [].append)
+        mock_combined.assert_called_once()

@@ -594,3 +594,291 @@ async def test_combined_options_flow_updates_entry(hass: HomeAssistant) -> None:
     assert result["type"] == FlowResultType.CREATE_ENTRY
     assert combined.data[CONF_GROUP_NAME] == "Renamed Combined"
     assert combined.data[CONF_COMBINED_GROUPS] == [entry_a.entry_id, entry_c.entry_id]
+
+
+async def test_combined_options_flow_empty_name_error(hass: HomeAssistant) -> None:
+    """Combined options flow returns error when group name is empty."""
+    entry_a = await _create_group_entry(hass, "Group A", ["binary_sensor.a"])
+    entry_b = await _create_group_entry(hass, "Group B", ["binary_sensor.b"])
+
+    combined = MockConfigEntry(
+        version=1,
+        domain=DOMAIN,
+        title="My Combined",
+        data={
+            CONF_ENTRY_TYPE: ENTRY_TYPE_COMBINED,
+            CONF_GROUP_NAME: "My Combined",
+            CONF_COMBINED_GROUPS: [entry_a.entry_id, entry_b.entry_id],
+        },
+        entry_id="combined_err1",
+        unique_id=f"{DOMAIN}_combined_err1",
+    )
+    combined.add_to_hass(hass)
+
+    with patch(
+        "custom_components.entity_availability.async_setup_entry",
+        return_value=True,
+    ):
+        await hass.config_entries.async_setup(combined.entry_id)
+        await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_init(combined.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {
+            CONF_GROUP_NAME: "   ",
+            CONF_COMBINED_GROUPS: [entry_a.entry_id, entry_b.entry_id],
+        },
+    )
+    assert result["type"] == FlowResultType.FORM
+    assert result["errors"][CONF_GROUP_NAME] == "empty_group_name"
+
+
+async def test_combined_options_flow_not_enough_groups_error(
+    hass: HomeAssistant,
+) -> None:
+    """Combined options flow returns error when fewer than 2 groups selected."""
+    entry_a = await _create_group_entry(hass, "Group A", ["binary_sensor.a"])
+    entry_b = await _create_group_entry(hass, "Group B", ["binary_sensor.b"])
+
+    combined = MockConfigEntry(
+        version=1,
+        domain=DOMAIN,
+        title="My Combined",
+        data={
+            CONF_ENTRY_TYPE: ENTRY_TYPE_COMBINED,
+            CONF_GROUP_NAME: "My Combined",
+            CONF_COMBINED_GROUPS: [entry_a.entry_id, entry_b.entry_id],
+        },
+        entry_id="combined_err2",
+        unique_id=f"{DOMAIN}_combined_err2",
+    )
+    combined.add_to_hass(hass)
+
+    with patch(
+        "custom_components.entity_availability.async_setup_entry",
+        return_value=True,
+    ):
+        await hass.config_entries.async_setup(combined.entry_id)
+        await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_init(combined.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {
+            CONF_GROUP_NAME: "Valid Name",
+            CONF_COMBINED_GROUPS: [entry_a.entry_id],
+        },
+    )
+    assert result["type"] == FlowResultType.FORM
+    assert result["errors"][CONF_COMBINED_GROUPS] == "not_enough_groups_selected"
+
+
+async def test_battery_auto_detection_via_device_registry(
+    hass: HomeAssistant,
+) -> None:
+    """Battery detection finds battery sensor via device registry in config flow.
+
+    Also covers the 'continue' branch that skips the monitored entity itself
+    when iterating device registry entries.
+    """
+    from unittest.mock import MagicMock, patch
+
+    from homeassistant.components.sensor import SensorDeviceClass
+
+    # self-entry: same entity_id as monitored — must be skipped (line 314 continue)
+    mock_self_entry = MagicMock()
+    mock_self_entry.entity_id = "lock.front_door"
+    mock_self_entry.original_device_class = None
+    mock_self_entry.device_class = None
+
+    mock_bat_entry = MagicMock()
+    mock_bat_entry.entity_id = "sensor.lock_battery"
+    mock_bat_entry.original_device_class = SensorDeviceClass.BATTERY
+    mock_bat_entry.device_class = SensorDeviceClass.BATTERY
+
+    mock_monitored_entry = MagicMock()
+    mock_monitored_entry.device_id = "device_abc"
+
+    mock_ent_reg = MagicMock()
+    mock_ent_reg.async_get.return_value = mock_monitored_entry
+
+    hass.states.async_set("sensor.lock_battery", "72")
+
+    with (
+        patch(
+            "custom_components.entity_availability.config_flow.er.async_get",
+            return_value=mock_ent_reg,
+        ),
+        patch(
+            "custom_components.entity_availability.config_flow.er.async_entries_for_device",
+            return_value=[mock_self_entry, mock_bat_entry],
+        ),
+    ):
+        result = await _init_flow(hass)
+        result = await _step_group(
+            hass, result["flow_id"], "Lock Group", ["lock.front_door"]
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {
+                CONF_BAD_STATES: DEFAULT_BAD_STATES,
+                CONF_COOLDOWN: DEFAULT_COOLDOWN,
+                CONF_STALENESS_THRESHOLD: DEFAULT_STALENESS_THRESHOLD,
+            },
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {
+                CONF_BATTERY_THRESHOLD: 20,
+                CONF_AVAILABILITY_WINDOWS: DEFAULT_AVAILABILITY_WINDOWS,
+            },
+        )
+
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "battery_mapping"
+
+
+async def test_battery_auto_detection_via_device_registry_options_flow(
+    hass: HomeAssistant,
+    mock_config_entry,
+) -> None:
+    """Battery detection via device registry in options flow covers lines 479-491.
+
+    Submits options with battery_threshold > 0 so _detect_battery_entity is called.
+    Two passes:
+    1. self-entry returned first — hits the continue branch (line 480)
+    2. a non-battery entry returned — falls through to naming convention (line 491)
+    """
+    from unittest.mock import MagicMock, patch
+
+    from homeassistant.components.sensor import SensorDeviceClass
+
+    # self-entry: same entity_id as monitored — must be skipped (continue, line 480)
+    mock_self_entry = MagicMock()
+    mock_self_entry.entity_id = "binary_sensor.device_a"
+    mock_self_entry.original_device_class = None
+    mock_self_entry.device_class = None
+
+    # Non-battery sibling entry — not skipped but no battery class → falls through
+    mock_other_entry = MagicMock()
+    mock_other_entry.entity_id = "sensor.device_a_signal"
+    mock_other_entry.original_device_class = SensorDeviceClass.SIGNAL_STRENGTH
+    mock_other_entry.device_class = None
+
+    mock_monitored_entry = MagicMock()
+    mock_monitored_entry.device_id = "device_xyz"
+
+    mock_ent_reg = MagicMock()
+    mock_ent_reg.async_get.return_value = mock_monitored_entry
+
+    mock_config_entry.add_to_hass(hass)
+    # Set battery state so naming-convention fallback (line 491) is hit
+    hass.states.async_set("sensor.device_a_battery", "80")
+    # Set battery state so naming-convention fallback (line 491) is also hit
+    hass.states.async_set("sensor.device_a_battery", "80")
+
+    with patch(
+        "custom_components.entity_availability.async_setup_entry",
+        return_value=True,
+    ):
+        await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    with (
+        patch(
+            "custom_components.entity_availability.config_flow.er.async_get",
+            return_value=mock_ent_reg,
+        ),
+        patch(
+            "custom_components.entity_availability.config_flow.er.async_entries_for_device",
+            return_value=[mock_self_entry, mock_other_entry],
+        ),
+    ):
+        result = await hass.config_entries.options.async_init(
+            mock_config_entry.entry_id
+        )
+        assert result["type"] == FlowResultType.FORM
+        assert result["step_id"] == "init"
+
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            {
+                CONF_ENTITIES: [
+                    "binary_sensor.device_a",
+                    "binary_sensor.device_b",
+                    "binary_sensor.device_c",
+                ],
+                CONF_BAD_STATES: DEFAULT_BAD_STATES,
+                CONF_COOLDOWN: DEFAULT_COOLDOWN,
+                CONF_STALENESS_THRESHOLD: DEFAULT_STALENESS_THRESHOLD,
+                CONF_BATTERY_THRESHOLD: 20,
+                CONF_AVAILABILITY_WINDOWS: DEFAULT_AVAILABILITY_WINDOWS,
+            },
+        )
+
+    # With battery_threshold > 0, should proceed to battery_mapping step
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "battery_mapping"
+
+
+async def test_battery_auto_detection_registry_success_options_flow(
+    hass: HomeAssistant,
+    mock_config_entry,
+) -> None:
+    """Options flow _detect_battery_entity returns registry entity (line 485)."""
+    from unittest.mock import MagicMock, patch
+
+    from homeassistant.components.sensor import SensorDeviceClass
+
+    mock_bat_entry = MagicMock()
+    mock_bat_entry.entity_id = "sensor.device_a_battery"
+    mock_bat_entry.original_device_class = SensorDeviceClass.BATTERY
+    mock_bat_entry.device_class = SensorDeviceClass.BATTERY
+
+    mock_monitored_entry = MagicMock()
+    mock_monitored_entry.device_id = "device_xyz"
+
+    mock_ent_reg = MagicMock()
+    mock_ent_reg.async_get.return_value = mock_monitored_entry
+
+    mock_config_entry.add_to_hass(hass)
+
+    with patch(
+        "custom_components.entity_availability.async_setup_entry",
+        return_value=True,
+    ):
+        await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    with (
+        patch(
+            "custom_components.entity_availability.config_flow.er.async_get",
+            return_value=mock_ent_reg,
+        ),
+        patch(
+            "custom_components.entity_availability.config_flow.er.async_entries_for_device",
+            return_value=[mock_bat_entry],
+        ),
+    ):
+        result = await hass.config_entries.options.async_init(
+            mock_config_entry.entry_id
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            {
+                CONF_ENTITIES: [
+                    "binary_sensor.device_a",
+                    "binary_sensor.device_b",
+                    "binary_sensor.device_c",
+                ],
+                CONF_BAD_STATES: DEFAULT_BAD_STATES,
+                CONF_COOLDOWN: DEFAULT_COOLDOWN,
+                CONF_STALENESS_THRESHOLD: DEFAULT_STALENESS_THRESHOLD,
+                CONF_BATTERY_THRESHOLD: 20,
+                CONF_AVAILABILITY_WINDOWS: DEFAULT_AVAILABILITY_WINDOWS,
+            },
+        )
+
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "battery_mapping"

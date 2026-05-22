@@ -10,6 +10,15 @@ import pytest
 from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
 
+from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+from custom_components.entity_availability.const import (
+    CONF_BATTERY_THRESHOLD,
+    CONF_ENTRY_TYPE,
+    CONF_GROUP_NAME,
+    DOMAIN,
+    ENTRY_TYPE_COMBINED,
+)
 from custom_components.entity_availability.coordinator import (
     EntityAvailabilityCoordinator,
 )
@@ -24,6 +33,7 @@ from custom_components.entity_availability.sensor import (
     OfflineDevicesSensor,
     RecentlyOfflineSensor,
     RecentlyRecoveredSensor,
+    async_setup_entry,
 )
 
 
@@ -681,3 +691,339 @@ class TestRecentlyOfflineSensorBoundary:
         value = sensor.native_value
         assert len(value) <= MAX_STATE_LENGTH
         assert value.endswith("...")
+
+
+# ---------------------------------------------------------------------------
+# async_setup_entry — combined path (lines 40-44)
+# ---------------------------------------------------------------------------
+
+
+async def test_sensor_setup_entry_combined_delegates(
+    mock_hass: HomeAssistant,
+) -> None:
+    """sensor.async_setup_entry for combined entry delegates to combined_sensor module."""
+    hass = mock_hass
+    combined_entry = MockConfigEntry(
+        version=1,
+        domain=DOMAIN,
+        title="My Combined",
+        data={
+            CONF_ENTRY_TYPE: ENTRY_TYPE_COMBINED,
+            CONF_GROUP_NAME: "My Combined",
+        },
+        entry_id="comb_sensor_id",
+    )
+    combined_entry.add_to_hass(hass)
+
+    added = []
+
+    with patch(
+        "custom_components.entity_availability.combined_sensor.async_setup_entry",
+        new_callable=AsyncMock,
+    ) as mock_combined:
+        await async_setup_entry(hass, combined_entry, added.append)
+        mock_combined.assert_called_once_with(hass, combined_entry, added.append)
+
+
+# ---------------------------------------------------------------------------
+# async_setup_entry — group path (lines 46-89)
+# ---------------------------------------------------------------------------
+
+
+async def test_sensor_setup_entry_group_with_battery_threshold_zero(
+    mock_hass: HomeAssistant, mock_config_data
+) -> None:
+    """When battery_threshold=0, DegradedDevicesSensor and LowBatteryCountSensor are NOT added."""
+    hass = mock_hass
+    config = dict(mock_config_data)
+    config[CONF_BATTERY_THRESHOLD] = 0
+
+    entry = MockConfigEntry(
+        version=1,
+        domain=DOMAIN,
+        title="No Battery Group",
+        data=config,
+        entry_id="no_bat_entry",
+    )
+    entry.add_to_hass(hass)
+    hass.data.setdefault(DOMAIN, {})
+
+    with patch.object(
+        EntityAvailabilityCoordinator, "_async_save_storage", new_callable=AsyncMock
+    ):
+        coord = EntityAvailabilityCoordinator(hass, entry)
+    hass.data[DOMAIN][entry.entry_id] = coord
+
+    added = []
+
+    def capture(entities):
+        added.extend(entities)
+
+    await async_setup_entry(hass, entry, capture)
+
+    types = [type(e).__name__ for e in added]
+    assert "DegradedDevicesSensor" not in types
+    assert "LowBatteryCountSensor" not in types
+    # AvailabilitySensor(s) and core sensors should still be there
+    assert "OfflineCountSensor" in types
+    assert "AvailabilitySensor" in types
+
+
+async def test_sensor_setup_entry_group_with_battery_threshold_positive(
+    mock_hass: HomeAssistant, mock_config_data
+) -> None:
+    """When battery_threshold>0, DegradedDevicesSensor and LowBatteryCountSensor ARE added."""
+    hass = mock_hass
+    config = dict(mock_config_data)
+    config[CONF_BATTERY_THRESHOLD] = 20
+
+    entry = MockConfigEntry(
+        version=1,
+        domain=DOMAIN,
+        title="Battery Group",
+        data=config,
+        entry_id="bat_entry",
+    )
+    entry.add_to_hass(hass)
+    hass.data.setdefault(DOMAIN, {})
+
+    with patch.object(
+        EntityAvailabilityCoordinator, "_async_save_storage", new_callable=AsyncMock
+    ):
+        coord = EntityAvailabilityCoordinator(hass, entry)
+    hass.data[DOMAIN][entry.entry_id] = coord
+
+    added = []
+
+    def capture(entities):
+        added.extend(entities)
+
+    await async_setup_entry(hass, entry, capture)
+
+    types = [type(e).__name__ for e in added]
+    assert "DegradedDevicesSensor" in types
+    assert "LowBatteryCountSensor" in types
+
+
+async def test_sensor_setup_entry_group_creates_availability_sensors_per_window(
+    mock_hass: HomeAssistant, mock_config_data
+) -> None:
+    """One AvailabilitySensor is created per configured window."""
+    from custom_components.entity_availability.const import CONF_AVAILABILITY_WINDOWS
+
+    hass = mock_hass
+    config = dict(mock_config_data)
+    config[CONF_AVAILABILITY_WINDOWS] = ["today", "7d", "3d"]
+
+    entry = MockConfigEntry(
+        version=1,
+        domain=DOMAIN,
+        title="Window Group",
+        data=config,
+        entry_id="window_entry",
+    )
+    entry.add_to_hass(hass)
+    hass.data.setdefault(DOMAIN, {})
+
+    with patch.object(
+        EntityAvailabilityCoordinator, "_async_save_storage", new_callable=AsyncMock
+    ):
+        coord = EntityAvailabilityCoordinator(hass, entry)
+    hass.data[DOMAIN][entry.entry_id] = coord
+
+    added = []
+
+    def capture(entities):
+        added.extend(entities)
+
+    await async_setup_entry(hass, entry, capture)
+
+    availability_sensors = [e for e in added if isinstance(e, AvailabilitySensor)]
+    assert len(availability_sensors) == 3
+
+
+# ---------------------------------------------------------------------------
+# DegradedDevicesSensor._format_device — no-friendly-name fallback (line 258)
+# ---------------------------------------------------------------------------
+
+
+class TestDegradedDevicesFallbackName:
+    """Test _format_device falls back to entity_id parsing when no friendly_name."""
+
+    def test_format_device_no_state(self, mock_coordinator, mock_hass):
+        """_format_device falls back to entity_id slug when state is None."""
+        mock_hass.states.async_remove("binary_sensor.device_a")
+
+        mock_coordinator._device_states["binary_sensor.device_a"].is_degraded = True
+        mock_coordinator._device_states["binary_sensor.device_a"].battery_level = 12
+        sensor = DegradedDevicesSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
+        sensor.hass = mock_hass
+        value = sensor.native_value
+        assert "Device A (12%)" in value
+
+    def test_format_device_state_without_friendly_name_attr(
+        self, mock_coordinator, mock_hass
+    ):
+        """_format_device uses entity_id slug when state exists but has no friendly_name."""
+        mock_hass.states.async_set("binary_sensor.device_a", "on", {})
+
+        mock_coordinator._device_states["binary_sensor.device_a"].is_degraded = True
+        mock_coordinator._device_states["binary_sensor.device_a"].battery_level = 8
+        sensor = DegradedDevicesSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
+        sensor.hass = mock_hass
+        value = sensor.native_value
+        assert "Device A (8%)" in value
+
+
+# ---------------------------------------------------------------------------
+# DegradedDevicesSensor.native_value truncation (line 240)
+# ---------------------------------------------------------------------------
+
+
+class TestDegradedDevicesTruncation:
+    """Test native_value truncation for DegradedDevicesSensor."""
+
+    def test_native_value_truncated_for_long_list(self, mock_coordinator, mock_hass):
+        """native_value is truncated to MAX_STATE_LENGTH when the list is very long."""
+        for i in range(60):
+            eid = f"binary_sensor.bat_device_{i:03d}"
+            mock_coordinator._device_states[eid] = DeviceState(
+                entity_id=eid,
+                is_degraded=True,
+                battery_level=5,
+            )
+            mock_hass.states.async_set(
+                eid,
+                "on",
+                {"friendly_name": f"Very Long Battery Device Name Number {i:03d}"},
+            )
+
+        sensor = DegradedDevicesSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
+        sensor.hass = mock_hass
+        value = sensor.native_value
+        assert len(value) <= MAX_STATE_LENGTH
+        assert value.endswith("...")
+
+
+# ---------------------------------------------------------------------------
+# AvailabilitySensor.extra_state_attributes — suppressed skip (line 353)
+# ---------------------------------------------------------------------------
+
+
+class TestAvailabilitySensorAttributesSuppressed:
+    """Test that suppressed devices are skipped in extra_state_attributes breakdown."""
+
+    def test_suppressed_excluded_from_per_device(self, mock_coordinator, mock_hass):
+        """Suppressed device does not appear in extra_state_attributes per_device."""
+        now = datetime.now(timezone.utc)
+        storage = mock_coordinator.availability_storage
+
+        for eid in mock_coordinator.monitored_entities:
+            storage.record_online(eid, 3600.0, now)
+
+        mock_coordinator._device_states["binary_sensor.device_a"].is_suppressed = True
+
+        sensor = AvailabilitySensor(
+            mock_coordinator, "Test Group", "test_group", "today", "test_entry_id"
+        )
+        sensor.hass = mock_hass
+        attrs = sensor.extra_state_attributes
+        assert "binary_sensor.device_a" not in attrs["per_device"]
+        assert "binary_sensor.device_b" in attrs["per_device"]
+
+
+# ---------------------------------------------------------------------------
+# GroupSummarySensor — battery_map branch (line 408)
+# ---------------------------------------------------------------------------
+
+
+class TestGroupSummaryBatteryMap:
+    """Test battery_powered calculation when battery_entity_map is set."""
+
+    def test_battery_powered_from_map(self, mock_hass, mock_config_data):
+        """battery_powered counts truthy values in battery_entity_map."""
+        from custom_components.entity_availability.const import CONF_BATTERY_ENTITY_MAP
+
+        config = dict(mock_config_data)
+        config[CONF_BATTERY_ENTITY_MAP] = {
+            "binary_sensor.device_a": "sensor.device_a_battery",
+            "binary_sensor.device_b": "",  # falsy — not counted
+            "binary_sensor.device_c": "sensor.device_c_battery",
+        }
+        entry = MockConfigEntry(
+            version=1,
+            domain=DOMAIN,
+            title="Battery Map Group",
+            data=config,
+            entry_id="bat_map_entry",
+        )
+
+        with patch.object(
+            EntityAvailabilityCoordinator, "_async_save_storage", new_callable=AsyncMock
+        ):
+            coord = EntityAvailabilityCoordinator(mock_hass, entry)
+        coord._device_states = {
+            "binary_sensor.device_a": DeviceState(entity_id="binary_sensor.device_a"),
+            "binary_sensor.device_b": DeviceState(entity_id="binary_sensor.device_b"),
+            "binary_sensor.device_c": DeviceState(entity_id="binary_sensor.device_c"),
+        }
+
+        sensor = GroupSummarySensor(
+            coord, "Battery Map Group", "battery_map_group", entry.entry_id
+        )
+        sensor.hass = mock_hass
+        attrs = sensor.extra_state_attributes
+        # 2 truthy entries in the map
+        assert attrs["battery_powered"] == 2
+
+
+# ---------------------------------------------------------------------------
+# RecentlyOfflineSensor._friendly_name — no-state fallback (line 490)
+# ---------------------------------------------------------------------------
+
+
+class TestRecentlyOfflineFriendlyNameFallback:
+    """Test _friendly_name fallback when entity has no state."""
+
+    def test_friendly_name_falls_back_when_no_state(self, mock_coordinator, mock_hass):
+        """_friendly_name returns title-cased slug when hass has no state for entity."""
+        mock_coordinator._device_states[
+            "binary_sensor.device_b"
+        ].recently_offline_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+
+        mock_hass.states.async_remove("binary_sensor.device_b")
+
+        sensor = RecentlyOfflineSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
+        sensor.hass = mock_hass
+        assert sensor.native_value == "Device B"
+
+
+# ---------------------------------------------------------------------------
+# RecentlyRecoveredSensor._friendly_name — no-state fallback (line 555)
+# ---------------------------------------------------------------------------
+
+
+class TestRecentlyRecoveredFriendlyNameFallback:
+    """Test _friendly_name fallback when entity has no state."""
+
+    def test_friendly_name_falls_back_when_no_state(self, mock_coordinator, mock_hass):
+        """_friendly_name returns title-cased slug when hass has no state."""
+        mock_coordinator._device_states["binary_sensor.device_a"].last_recovery = (
+            datetime.now(timezone.utc) - timedelta(minutes=1)
+        )
+
+        mock_hass.states.async_remove("binary_sensor.device_a")
+
+        sensor = RecentlyRecoveredSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
+        sensor.hass = mock_hass
+        assert sensor.native_value == "Device A"

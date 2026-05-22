@@ -140,6 +140,8 @@ For example, a group named "Security Devices" produces the slug `security_device
 | `sensor..._low_battery_count` | Sensor | Number of entities with low battery | — |
 | `sensor..._group_summary` | Sensor | Total entity count in the group | total_entities, online, offline, suppressed, battery_powered, low_battery |
 | `sensor..._availability_today` | Sensor | Group availability % for today | Per-entity availability breakdown |
+| `sensor..._availability_3d` | Sensor | Group availability % over 3 days | Per-entity availability breakdown |
+| `sensor..._availability_5d` | Sensor | Group availability % over 5 days | Per-entity availability breakdown |
 | `sensor..._availability_7d` | Sensor | Group availability % over 7 days | Per-entity availability breakdown |
 | `binary_sensor..._any_offline` | Binary Sensor (Problem) | ON when at least one entity is offline | offline_entities, offline_count |
 
@@ -718,6 +720,10 @@ Selecting a combined group hides editor controls that don't apply (availability 
 ```
 
 ![Card — Side by Side](custom_components/entity_availability/docs/11_card_side_by_side.png)
+
+### Dashboard Example
+
+![Dashboard Example](custom_components/entity_availability/docs/12_dashboard_example.png)
 
 ---
 

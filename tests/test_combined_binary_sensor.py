@@ -356,3 +356,50 @@ class TestCombinedBinarySensorSetupEntry:
         await async_setup_entry(mock_hass, combined_entry, _fake_add)
         # Still registers the sensor, just with fewer coordinators
         assert len(added) == 1
+
+
+# ---------------------------------------------------------------------------
+# CombinedGroupAnyOfflineBinarySensor — callback fires async_write_ha_state (line 82)
+# ---------------------------------------------------------------------------
+
+
+class TestCombinedBinarySensorCallbackFires:
+    """Test that the coordinator update callback calls async_write_ha_state."""
+
+    async def test_coordinator_callback_calls_write_ha_state(
+        self, mock_hass, combined_entry, coordinators
+    ):
+        """The _on_coordinator_update callback invokes async_write_ha_state."""
+        mock_hass.data[DOMAIN] = {
+            "entry_a": coordinators[0],
+            "entry_b": coordinators[1],
+        }
+
+        sensor = CombinedGroupAnyOfflineBinarySensor(
+            mock_hass,
+            combined_entry,
+            "Combined",
+            "combined",
+            coordinators,
+            [c.entry.entry_id for c in coordinators],
+        )
+
+        write_state_calls = []
+        sensor.async_write_ha_state = lambda: write_state_calls.append(True)
+
+        captured_callbacks = []
+
+        def fake_add_listener(callback):
+            captured_callbacks.append(callback)
+            return lambda: None
+
+        for coord in coordinators:
+            coord.async_add_listener = fake_add_listener
+
+        await sensor.async_added_to_hass()
+
+        # Fire the first registered callback
+        assert len(captured_callbacks) >= 1
+        captured_callbacks[0]()
+
+        assert len(write_state_calls) == 1

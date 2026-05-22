@@ -298,3 +298,76 @@ class TestSerialization:
 
         expected_start = now.replace(minute=30, second=0, microsecond=0)
         assert restored._buckets["sensor.test"][0].interval_start == expected_start
+
+
+# ---------------------------------------------------------------------------
+# record_online — zero/negative seconds skipped (line 74)
+# record_offline — zero/negative seconds skipped (line 82)
+# ---------------------------------------------------------------------------
+
+
+class TestRecordEdgeCases:
+    """Tests for zero/negative seconds handling in record_online and record_offline."""
+
+    def test_record_online_zero_seconds_no_bucket(
+        self, storage: AvailabilityStorage, now: datetime
+    ) -> None:
+        """record_online with 0 seconds does not create a bucket."""
+        storage.record_online("sensor.test", 0, now)
+        assert "sensor.test" not in storage._buckets
+
+    def test_record_online_negative_seconds_no_bucket(
+        self, storage: AvailabilityStorage, now: datetime
+    ) -> None:
+        """record_online with negative seconds does not create a bucket."""
+        storage.record_online("sensor.test", -10.0, now)
+        assert "sensor.test" not in storage._buckets
+
+    def test_record_offline_zero_seconds_no_bucket(
+        self, storage: AvailabilityStorage, now: datetime
+    ) -> None:
+        """record_offline with 0 seconds does not create a bucket."""
+        storage.record_offline("sensor.test", 0, now)
+        assert "sensor.test" not in storage._buckets
+
+    def test_record_offline_negative_seconds_no_bucket(
+        self, storage: AvailabilityStorage, now: datetime
+    ) -> None:
+        """record_offline with negative seconds does not create a bucket."""
+        storage.record_offline("sensor.test", -5.0, now)
+        assert "sensor.test" not in storage._buckets
+
+
+# ---------------------------------------------------------------------------
+# get_availability — no relevant buckets (lines 103-109)
+# get_availability — total_time == 0 path (line 128)
+# ---------------------------------------------------------------------------
+
+
+class TestGetAvailabilityEdgeCases:
+    """Edge case tests for get_availability."""
+
+    def test_all_buckets_older_than_window_returns_none(
+        self, storage: AvailabilityStorage, now: datetime
+    ) -> None:
+        """Returns None when all buckets are older than the requested window."""
+        # Record data 48 hours ago — outside the 'today' (24h) window
+        old_time = now - timedelta(hours=48)
+        storage.record_online("sensor.test", float(BUCKET_INTERVAL), old_time)
+
+        result = storage.get_availability("sensor.test", "today", now)
+        assert result is None
+
+    def test_total_time_zero_returns_none(
+        self, storage: AvailabilityStorage, now: datetime
+    ) -> None:
+        """Returns None if the sum of bucket total_seconds is 0."""
+        from custom_components.entity_availability.storage import AvailabilityBucket
+
+        # Inject a bucket with total_seconds=0 (edge case)
+        bucket = AvailabilityBucket(interval_start=now, online_seconds=0.0)
+        bucket.total_seconds = 0.0
+        storage._buckets["sensor.test"] = [bucket]
+
+        result = storage.get_availability("sensor.test", "today", now)
+        assert result is None
