@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 - Coordinator: timezone-naive `state.last_changed` values are now guarded with `.replace(tzinfo=timezone.utc)` in both the staleness check and `cooldown_start` assignment — prevents comparison errors on systems where HA returns tz-naive datetimes
 - Sensor: `group_summary` `online` count no longer over-reports when entities have not yet been processed by the coordinator — count now iterates over `monitored_entities` instead of `device_states.values()`
 - Init: `_card_installed` flag moved from a module-level global to `hass.data[DOMAIN]` — prevents cross-instance state bleed when multiple HA instances run in the same process
+- Card: `CARD_VERSION` constant corrected to `0.3.3` (was mismatched with integration version)
 
 ### Changed
 - Storage: unknown availability window strings now log a warning before falling back to 24 h
