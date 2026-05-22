@@ -1321,3 +1321,78 @@ async def test_cooldown_start_uses_last_changed_when_earlier(
     device_a = coord.device_states["binary_sensor.device_a"]
     assert device_a.cooldown_start is not None
     assert device_a.cooldown_start == earlier
+
+
+async def test_staleness_detection_tz_naive_last_changed(
+    mock_hass: HomeAssistant, mock_config_data
+) -> None:
+    """Staleness detection handles tz-naive last_changed without TypeError."""
+    hass = mock_hass
+    config = dict(mock_config_data)
+    config[CONF_STALENESS_THRESHOLD] = 10
+
+    entry = MockConfigEntry(
+        version=1,
+        domain=DOMAIN,
+        title="Test Group",
+        data=config,
+        entry_id="test_entry_tz_naive",
+        unique_id=f"{DOMAIN}_test_tz_naive",
+    )
+
+    # Inject a State with tz-naive last_changed (no tzinfo)
+    old_time_naive = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(
+        minutes=15
+    )
+    state = State(
+        "binary_sensor.device_a",
+        "on",
+        {"friendly_name": "Device A"},
+        last_changed=old_time_naive,
+        last_updated=old_time_naive,
+    )
+    hass.states.async_set("binary_sensor.device_a", "on", {"friendly_name": "Device A"})
+    hass.states._states["binary_sensor.device_a"] = state
+
+    with patch.object(
+        EntityAvailabilityCoordinator, "_async_save_storage", new_callable=AsyncMock
+    ):
+        coord = EntityAvailabilityCoordinator(hass, entry)
+        coord._last_update = None
+        # Should not raise TypeError even with tz-naive last_changed
+        await coord._async_update_data()
+
+    device_a = coord.device_states["binary_sensor.device_a"]
+    assert device_a.is_degraded is True
+
+
+async def test_cooldown_start_tz_naive_last_changed(
+    mock_hass: HomeAssistant, mock_config_entry
+) -> None:
+    """cooldown_start is set correctly when state.last_changed is tz-naive."""
+    hass = mock_hass
+    naive_time = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=1)
+
+    state = State(
+        "binary_sensor.device_a",
+        "unavailable",
+        {"friendly_name": "Device A"},
+        last_changed=naive_time,
+        last_updated=naive_time,
+    )
+    hass.states.async_set("binary_sensor.device_a", "unavailable")
+    hass.states._states["binary_sensor.device_a"] = state
+
+    with patch.object(
+        EntityAvailabilityCoordinator, "_async_save_storage", new_callable=AsyncMock
+    ):
+        coord = EntityAvailabilityCoordinator(hass, mock_config_entry)
+        coord._startup_time = datetime.now(timezone.utc) - timedelta(
+            seconds=STARTUP_GRACE_PERIOD + 10
+        )
+        coord._last_update = None
+        # Should not raise TypeError
+        await coord._async_update_data()
+
+    device_a = coord.device_states["binary_sensor.device_a"]
+    assert device_a.cooldown_start is not None

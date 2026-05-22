@@ -221,6 +221,16 @@ class TestWindowCalculation:
         assert AvailabilityStorage._window_to_hours("7d") == 168
         assert AvailabilityStorage._window_to_hours("unknown") == 24
 
+    def test_window_to_hours_unknown_logs_warning(self, caplog) -> None:
+        """Unknown window string logs a warning and returns 24."""
+        import logging
+
+        with caplog.at_level(logging.WARNING):
+            result = AvailabilityStorage._window_to_hours("2d")
+        assert result == 24
+        assert "Unknown availability window" in caplog.text
+        assert "2d" in caplog.text
+
 
 class TestSerialization:
     """Tests for serialization and deserialization."""

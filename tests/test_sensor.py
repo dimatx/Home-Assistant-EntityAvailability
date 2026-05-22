@@ -384,6 +384,22 @@ class TestGroupSummarySensor:
         assert attrs["battery_powered"] == 1  # device_a has battery_level
         assert attrs["low_battery"] == 0
 
+    def test_attributes_online_excludes_unprocessed_entities(
+        self, mock_coordinator, mock_hass
+    ):
+        """online count uses monitored_entities as denominator, not device_states keys."""
+        # Remove device_c from device_states (simulates entity not yet processed)
+        del mock_coordinator._device_states["binary_sensor.device_c"]
+        sensor = GroupSummarySensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
+        sensor.hass = mock_hass
+        attrs = sensor.extra_state_attributes
+        # total=3, offline=1 (device_b), suppressed=0, online should be 2 not 3
+        assert attrs["total_entities"] == 3
+        assert attrs["offline"] == 1
+        assert attrs["online"] == 2
+
     def test_attributes_with_suppressed(self, mock_coordinator, mock_hass):
         """Test that suppressed entities are counted correctly."""
         mock_coordinator._device_states["binary_sensor.device_c"].is_suppressed = True

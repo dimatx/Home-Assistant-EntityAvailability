@@ -25,7 +25,7 @@ PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BINARY_SENSOR]
 
 CARD_FILENAME = "entity-availability-card.js"
 CARD_URL = f"/entity_availability/{CARD_FILENAME}"
-_CARD_INSTALLED = False
+_CARD_INSTALLED_KEY = "_card_installed"
 
 
 def _get_version() -> str:
@@ -74,8 +74,8 @@ async def _async_update_options(hass: HomeAssistant, entry: ConfigEntry) -> None
 
 async def _async_install_card(hass: HomeAssistant) -> None:
     """Serve card JS from component dir and register as Lovelace resource."""
-    global _CARD_INSTALLED
-    if _CARD_INSTALLED:
+    domain_data = hass.data.setdefault(DOMAIN, {})
+    if domain_data.get(_CARD_INSTALLED_KEY):
         return
 
     source = Path(__file__).parent / "frontend" / CARD_FILENAME
@@ -93,7 +93,7 @@ async def _async_install_card(hass: HomeAssistant) -> None:
         _LOGGER.debug("Static path %s already registered", CARD_URL)
 
     await _async_register_lovelace_resource(hass, version)
-    _CARD_INSTALLED = True
+    hass.data[DOMAIN][_CARD_INSTALLED_KEY] = True
 
 
 async def _async_register_lovelace_resource(hass: HomeAssistant, version: str) -> None:
@@ -154,11 +154,18 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
 
+    remaining = [
+        e
+        for e in hass.config_entries.async_entries(DOMAIN)
+        if e.state is ConfigEntryState.LOADED and e.entry_id != entry.entry_id
+    ]
     if not any(
         e.data.get(CONF_ENTRY_TYPE, ENTRY_TYPE_GROUP) == ENTRY_TYPE_GROUP
-        for e in hass.config_entries.async_entries(DOMAIN)
-        if e.state is ConfigEntryState.LOADED
+        for e in remaining
     ):
         async_unload_services(hass)
+
+    if not remaining:
+        hass.data.get(DOMAIN, {}).pop(_CARD_INSTALLED_KEY, None)
 
     return unload_ok

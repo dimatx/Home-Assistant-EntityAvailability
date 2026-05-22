@@ -178,4 +178,5 @@ class AvailabilityStorage:
             return 120
         if window == "7d":
             return 168
+        _LOGGER.warning("Unknown availability window '%s', defaulting to 24h", window)
         return 24

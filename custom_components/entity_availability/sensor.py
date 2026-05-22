@@ -390,9 +390,17 @@ class GroupSummarySensor(
         states = self.coordinator.device_states
         total = len(self.coordinator.monitored_entities)
         offline = sum(
-            1 for d in states.values() if d.is_offline and not d.is_suppressed
+            1
+            for eid in self.coordinator.monitored_entities
+            if states.get(eid)
+            and states[eid].is_offline
+            and not states[eid].is_suppressed
         )
-        suppressed = sum(1 for d in states.values() if d.is_suppressed)
+        suppressed = sum(
+            1
+            for eid in self.coordinator.monitored_entities
+            if states.get(eid) and states[eid].is_suppressed
+        )
         online = total - offline - suppressed
 
         battery_map = self.coordinator.entry.data.get(CONF_BATTERY_ENTITY_MAP, {})

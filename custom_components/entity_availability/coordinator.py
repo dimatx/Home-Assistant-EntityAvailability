@@ -376,7 +376,10 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
             # Staleness check
             is_stale = False
             if self._staleness_threshold > 0 and state and state.last_changed:
-                age = (now - state.last_changed).total_seconds() / 60
+                last_changed = state.last_changed
+                if last_changed.tzinfo is None:
+                    last_changed = last_changed.replace(tzinfo=timezone.utc)
+                age = (now - last_changed).total_seconds() / 60
                 if age > self._staleness_threshold:
                     is_stale = True
                     _LOGGER.debug(
@@ -391,10 +394,11 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
             # Cooldown logic
             if is_bad:
                 if device.cooldown_start is None:
+                    _lc = state.last_changed if state and state.last_changed else None
+                    if _lc is not None and _lc.tzinfo is None:
+                        _lc = _lc.replace(tzinfo=timezone.utc)
                     device.cooldown_start = (
-                        state.last_changed
-                        if state and state.last_changed and state.last_changed < now
-                        else now
+                        _lc if _lc is not None and _lc < now else now
                     )
                     _LOGGER.debug(
                         "[%s] %s entered bad state (%s), cooldown started",

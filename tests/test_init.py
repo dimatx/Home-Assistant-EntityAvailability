@@ -247,3 +247,44 @@ async def test_combined_unload_entry(mock_hass: HomeAssistant) -> None:
 
     assert result is True
     mock_unload.assert_called_once_with(combined, PLATFORMS)
+
+
+async def test_card_installed_flag_reset_on_full_unload(
+    mock_hass: HomeAssistant, mock_config_entry
+) -> None:
+    """_CARD_INSTALLED_KEY is cleared from hass.data when the last entry unloads."""
+    from custom_components.entity_availability import _CARD_INSTALLED_KEY
+
+    hass = mock_hass
+    mock_config_entry.add_to_hass(hass)
+
+    with (
+        patch.object(
+            EntityAvailabilityCoordinator,
+            "async_config_entry_first_refresh",
+            new_callable=AsyncMock,
+        ),
+        patch(
+            "custom_components.entity_availability.async_setup_services",
+            new_callable=AsyncMock,
+        ),
+        patch.object(
+            hass.config_entries,
+            "async_forward_entry_setups",
+            new_callable=AsyncMock,
+        ),
+    ):
+        await async_setup_entry(hass, mock_config_entry)
+
+    # Simulate card installed
+    hass.data[DOMAIN][_CARD_INSTALLED_KEY] = True
+
+    with patch.object(
+        hass.config_entries,
+        "async_unload_platforms",
+        new_callable=AsyncMock,
+        return_value=True,
+    ):
+        await async_unload_entry(hass, mock_config_entry)
+
+    assert _CARD_INSTALLED_KEY not in hass.data.get(DOMAIN, {})
