@@ -422,3 +422,90 @@ async def test_unsuppress_service_no_args_logs_warning(setup_services, caplog) -
         )
 
     assert "Either entity_id or group must be provided" in caplog.text
+
+
+# ---------------------------------------------------------------------------
+# isinstance guard — non-coordinator values in hass.data[DOMAIN]
+# ---------------------------------------------------------------------------
+
+
+async def test_suppress_skips_non_coordinator_values(setup_services) -> None:
+    """Service entity loop skips non-coordinator values (e.g. _card_installed=True)."""
+    hass, coord = setup_services
+    # Reorder so non-coordinator value is iterated before the coordinator
+    entry_id = list(hass.data[DOMAIN].keys())[0]
+    coord_ref = hass.data[DOMAIN].pop(entry_id)
+    hass.data[DOMAIN]["_card_installed"] = True
+    hass.data[DOMAIN][entry_id] = coord_ref
+
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_SUPPRESS,
+        {ATTR_ENTITY_ID: "binary_sensor.device_a", ATTR_DURATION: 10},
+        blocking=True,
+    )
+
+    assert coord.device_states["binary_sensor.device_a"].is_suppressed is True
+
+
+async def test_suppress_indefinitely_skips_non_coordinator_values(
+    setup_services,
+) -> None:
+    """suppress_indefinitely entity loop skips non-coordinator values."""
+    hass, coord = setup_services
+    entry_id = list(hass.data[DOMAIN].keys())[0]
+    coord_ref = hass.data[DOMAIN].pop(entry_id)
+    hass.data[DOMAIN]["_card_installed"] = True
+    hass.data[DOMAIN][entry_id] = coord_ref
+
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_SUPPRESS_INDEFINITELY,
+        {ATTR_ENTITY_ID: "binary_sensor.device_a"},
+        blocking=True,
+    )
+
+    assert coord.device_states["binary_sensor.device_a"].is_suppressed is True
+    assert coord.device_states["binary_sensor.device_a"].suppress_until is None
+
+
+async def test_unsuppress_skips_non_coordinator_values(setup_services) -> None:
+    """unsuppress entity loop skips non-coordinator values."""
+    hass, coord = setup_services
+    entry_id = list(hass.data[DOMAIN].keys())[0]
+    coord_ref = hass.data[DOMAIN].pop(entry_id)
+    hass.data[DOMAIN]["_card_installed"] = True
+    hass.data[DOMAIN][entry_id] = coord_ref
+    coord.suppress_entity(
+        "binary_sensor.device_a",
+        datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_UNSUPPRESS,
+        {ATTR_ENTITY_ID: "binary_sensor.device_a"},
+        blocking=True,
+    )
+
+    assert coord.device_states["binary_sensor.device_a"].is_suppressed is False
+
+
+async def test_find_coordinator_skips_non_coordinator_values(setup_services) -> None:
+    """_find_coordinator skips non-coordinator values in group lookup."""
+    hass, coord = setup_services
+    entry_id = list(hass.data[DOMAIN].keys())[0]
+    coord_ref = hass.data[DOMAIN].pop(entry_id)
+    hass.data[DOMAIN]["_card_installed"] = True
+    hass.data[DOMAIN][entry_id] = coord_ref
+
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_SUPPRESS,
+        {ATTR_GROUP: "Test Group", ATTR_DURATION: 10},
+        blocking=True,
+    )
+
+    for entity_id in coord.monitored_entities:
+        if entity_id in coord.device_states:
+            assert coord.device_states[entity_id].is_suppressed is True
