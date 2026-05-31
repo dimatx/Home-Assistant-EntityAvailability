@@ -11,6 +11,7 @@ from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.helpers import config_validation as cv
 
 from .const import DOMAIN
+from .coordinator import EntityAvailabilityCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -56,6 +57,8 @@ async def async_setup_services(hass: HomeAssistant) -> None:
     def _find_coordinator(group: str):
         """Find coordinator by group name or config entry ID."""
         for coordinator in hass.data.get(DOMAIN, {}).values():
+            if not isinstance(coordinator, EntityAvailabilityCoordinator):
+                continue
             if coordinator.group_name == group or coordinator.entry.entry_id == group:
                 return coordinator
         return None
@@ -88,6 +91,8 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             return
 
         for coordinator in hass.data.get(DOMAIN, {}).values():
+            if not isinstance(coordinator, EntityAvailabilityCoordinator):
+                continue
             if entity_id in coordinator.monitored_entities:
                 coordinator.suppress_entity(entity_id, until)
                 coordinator.async_set_updated_data(coordinator.data)
@@ -120,6 +125,8 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             return
 
         for coordinator in hass.data.get(DOMAIN, {}).values():
+            if not isinstance(coordinator, EntityAvailabilityCoordinator):
+                continue
             if entity_id in coordinator.monitored_entities:
                 coordinator.suppress_entity(entity_id, until=None)
                 coordinator.async_set_updated_data(coordinator.data)
@@ -152,6 +159,8 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             return
 
         for coordinator in hass.data.get(DOMAIN, {}).values():
+            if not isinstance(coordinator, EntityAvailabilityCoordinator):
+                continue
             if entity_id in coordinator.monitored_entities:
                 coordinator.unsuppress_entity(entity_id)
                 coordinator.async_set_updated_data(coordinator.data)
