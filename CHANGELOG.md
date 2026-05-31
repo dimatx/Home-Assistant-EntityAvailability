@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.3.5-beta.2] - 2026-05-31
+
+### Fixed
+- Sensor/BinarySensor: group names containing forward slashes (e.g. "Motion/Presence Sensors") no longer generate invalid entity IDs — all non-alphanumeric characters are now replaced with underscores when building the entity ID slug. This fixes HA 2027.2.0 deprecation warnings.
+
 ## [0.3.5-beta.1] - 2026-05-31
 
 ### Fixed

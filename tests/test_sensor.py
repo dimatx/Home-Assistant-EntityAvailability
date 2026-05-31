@@ -1027,3 +1027,45 @@ class TestRecentlyRecoveredFriendlyNameFallback:
         )
         sensor.hass = mock_hass
         assert sensor.native_value == "Device A"
+
+
+# ---------------------------------------------------------------------------
+# group_slug sanitization — forward slash and special chars (GH issue)
+# ---------------------------------------------------------------------------
+
+
+async def test_sensor_setup_entry_slug_sanitizes_slash_in_group_name(
+    mock_hass: HomeAssistant, mock_config_data
+) -> None:
+    """Group names with slashes produce valid entity IDs (no slash in slug)."""
+    hass = mock_hass
+    config = dict(mock_config_data)
+    config[CONF_GROUP_NAME] = "Motion/Presence Sensors"
+
+    entry = MockConfigEntry(
+        version=1,
+        domain=DOMAIN,
+        title="Motion/Presence Sensors",
+        data=config,
+        entry_id="slash_entry",
+    )
+    entry.add_to_hass(hass)
+    hass.data.setdefault(DOMAIN, {})
+
+    with patch.object(
+        EntityAvailabilityCoordinator, "_async_save_storage", new_callable=AsyncMock
+    ):
+        coord = EntityAvailabilityCoordinator(hass, entry)
+    hass.data[DOMAIN][entry.entry_id] = coord
+
+    added = []
+
+    def capture(entities):
+        added.extend(entities)
+
+    await async_setup_entry(hass, entry, capture)
+
+    for entity in added:
+        assert "/" not in entity.entity_id, (
+            f"entity_id '{entity.entity_id}' contains forward slash"
+        )

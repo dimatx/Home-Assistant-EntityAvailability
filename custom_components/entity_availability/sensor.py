@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime, timezone
 from typing import Any
 
@@ -45,7 +46,7 @@ async def async_setup_entry(
 
     coordinator: EntityAvailabilityCoordinator = hass.data[DOMAIN][entry.entry_id]
     group_name = entry.data[CONF_GROUP_NAME]
-    group_slug = group_name.lower().replace(" ", "_")
+    group_slug = re.sub(r"[^a-z0-9_]+", "_", group_name.lower()).strip("_")
     windows = entry.data.get(CONF_AVAILABILITY_WINDOWS, DEFAULT_AVAILABILITY_WINDOWS)
 
     _LOGGER.debug(

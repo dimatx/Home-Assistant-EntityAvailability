@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import Any
@@ -33,7 +34,7 @@ async def async_setup_entry(
 ) -> None:
     """Set up combined group sensors."""
     group_name = entry.data[CONF_GROUP_NAME]
-    group_slug = group_name.lower().replace(" ", "_")
+    group_slug = re.sub(r"[^a-z0-9_]+", "_", group_name.lower()).strip("_")
     combined_entry_ids: list[str] = entry.data.get(CONF_COMBINED_GROUPS, [])
 
     coordinators: list[EntityAvailabilityCoordinator] = [

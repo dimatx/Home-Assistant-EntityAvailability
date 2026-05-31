@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from homeassistant.components.binary_sensor import (
@@ -32,7 +33,7 @@ async def async_setup_entry(
 
     coordinator: EntityAvailabilityCoordinator = hass.data[DOMAIN][entry.entry_id]
     group_name = entry.data[CONF_GROUP_NAME]
-    group_slug = group_name.lower().replace(" ", "_")
+    group_slug = re.sub(r"[^a-z0-9_]+", "_", group_name.lower()).strip("_")
 
     async_add_entities(
         [
