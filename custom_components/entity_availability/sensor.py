@@ -411,11 +411,12 @@ class GroupSummarySensor(
                 1 for d in states.values() if d.battery_level is not None
             )
 
-        low_battery = sum(
-            1
-            for d in states.values()
+        low_battery_entities = [
+            eid
+            for eid, d in states.items()
             if d.is_degraded and not d.is_suppressed and d.battery_level is not None
-        )
+        ]
+        low_battery = len(low_battery_entities)
 
         return {
             "total_entities": total,
@@ -424,6 +425,7 @@ class GroupSummarySensor(
             "suppressed": suppressed,
             "battery_powered": battery_powered,
             "low_battery": low_battery,
+            "low_battery_entities": low_battery_entities,
             "entities": list(self.coordinator.monitored_entities),
             "battery_levels": {
                 eid: d.battery_level

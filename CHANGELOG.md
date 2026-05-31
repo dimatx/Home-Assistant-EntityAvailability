@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.3.4-beta.1] - 2026-05-31
+
+### Fixed
+- Card: low-battery entities are now correctly included in `entity_filter: offline` view. Previously the card hardcoded a `20%` threshold that diverged from the integration's configurable `battery_threshold`, causing low-battery entities to be hidden when the configured threshold differed from 20.
+- Sensor: `group_summary` exposes a new `low_battery_entities` attribute (list of entity IDs flagged as degraded by the coordinator) so the card no longer needs to reconstruct the threshold check.
+
+### Changed
+- Card: section title for `entity_filter: offline` renamed from "Offline Entities" to "Problem Entities" since the filter includes offline, stale, and low-battery entities.
+
 ## [0.3.3] - 2026-05-22
 
 ### Fixed
