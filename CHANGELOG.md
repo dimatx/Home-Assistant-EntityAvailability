@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.3.5-beta.1] - 2026-05-31
+
+### Fixed
+- Services: suppress, suppress_indefinitely, and unsuppress handlers now skip non-coordinator values in `hass.data[DOMAIN]` — prevents `AttributeError` crash when the card is installed and a service call is made
+- Init: removed redundant `resources.loaded = True` assignment after `async_load()` — HA manages this flag internally
+
 ## [0.3.4] - 2026-05-31
 
 ### Fixed
