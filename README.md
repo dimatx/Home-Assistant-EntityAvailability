@@ -28,6 +28,7 @@ Monitor entity availability in Home Assistant. Track offline entities, availabil
 - **Maintenance/suppression mode** -- temporarily exclude entities from monitoring
 - **Custom Lovelace card** -- traffic-light status display with at-a-glance health overview
 - **Self-managed storage** -- no recorder dependency; data stored in `.storage`
+- **Recorder-friendly writes** -- sensors only publish state when value or attributes actually change, so steady-state networks don't generate redundant history rows every coordinator tick
 - **Survives HA restarts** -- availability history persisted via HA Store
 
 ---

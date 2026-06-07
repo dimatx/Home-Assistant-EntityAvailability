@@ -7,11 +7,11 @@ import re
 from datetime import datetime, timezone
 from typing import Any
 
-from homeassistant.components.sensor import SensorEntity, SensorStateClass
+from homeassistant.components.sensor import SensorStateClass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 
 from .const import (
@@ -26,6 +26,7 @@ from .const import (
     ENTRY_TYPE_COMBINED,
 )
 from .coordinator import EntityAvailabilityCoordinator
+from .write_dedup import DedupCoordinatorSensor
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -56,7 +57,7 @@ async def async_setup_entry(
         len(coordinator.monitored_entities),
     )
 
-    entities: list[SensorEntity] = [
+    entities: list[Entity] = [
         OfflineCountSensor(coordinator, group_name, group_slug, entry.entry_id),
         OfflineDevicesSensor(coordinator, group_name, group_slug, entry.entry_id),
         GroupSummarySensor(coordinator, group_name, group_slug, entry.entry_id),
@@ -100,9 +101,7 @@ def _device_info(entry_id: str, group_slug: str, group_name: str) -> DeviceInfo:
     )
 
 
-class OfflineCountSensor(
-    CoordinatorEntity[EntityAvailabilityCoordinator], SensorEntity
-):
+class OfflineCountSensor(DedupCoordinatorSensor):
     """Sensor showing count of offline devices in the group."""
 
     _attr_icon = "mdi:alert-circle"
@@ -149,9 +148,7 @@ class OfflineCountSensor(
         }
 
 
-class OfflineDevicesSensor(
-    CoordinatorEntity[EntityAvailabilityCoordinator], SensorEntity
-):
+class OfflineDevicesSensor(DedupCoordinatorSensor):
     """Sensor showing comma-separated list of offline entity names."""
 
     _attr_icon = "mdi:devices"
@@ -204,9 +201,7 @@ class OfflineDevicesSensor(
         return entity_id.split(".")[-1].replace("_", " ").title()
 
 
-class DegradedDevicesSensor(
-    CoordinatorEntity[EntityAvailabilityCoordinator], SensorEntity
-):
+class DegradedDevicesSensor(DedupCoordinatorSensor):
     """Sensor showing devices with low battery."""
 
     _attr_icon = "mdi:battery-alert"
@@ -260,9 +255,7 @@ class DegradedDevicesSensor(
         return f"{name} ({device.battery_level}%)"
 
 
-class LowBatteryCountSensor(
-    CoordinatorEntity[EntityAvailabilityCoordinator], SensorEntity
-):
+class LowBatteryCountSensor(DedupCoordinatorSensor):
     """Sensor showing count of devices with low battery."""
 
     _attr_icon = "mdi:battery-alert-variant-outline"
@@ -293,9 +286,7 @@ class LowBatteryCountSensor(
         )
 
 
-class AvailabilitySensor(
-    CoordinatorEntity[EntityAvailabilityCoordinator], SensorEntity
-):
+class AvailabilitySensor(DedupCoordinatorSensor):
     """Sensor showing group availability % for a time window."""
 
     _attr_icon = "mdi:chart-line"
@@ -357,9 +348,7 @@ class AvailabilitySensor(
         return {"per_device": breakdown}
 
 
-class GroupSummarySensor(
-    CoordinatorEntity[EntityAvailabilityCoordinator], SensorEntity
-):
+class GroupSummarySensor(DedupCoordinatorSensor):
     """Sensor showing total entity count with detailed breakdown in attributes."""
 
     _attr_icon = "mdi:format-list-group"
@@ -449,9 +438,7 @@ class GroupSummarySensor(
         }
 
 
-class RecentlyOfflineSensor(
-    CoordinatorEntity[EntityAvailabilityCoordinator], SensorEntity
-):
+class RecentlyOfflineSensor(DedupCoordinatorSensor):
     """Sensor showing entities that went offline within the recovery window."""
 
     _attr_icon = "mdi:lan-disconnect"
@@ -514,9 +501,7 @@ class RecentlyOfflineSensor(
         }
 
 
-class RecentlyRecoveredSensor(
-    CoordinatorEntity[EntityAvailabilityCoordinator], SensorEntity
-):
+class RecentlyRecoveredSensor(DedupCoordinatorSensor):
     """Sensor showing entities that recovered from offline within the recovery window."""
 
     _attr_icon = "mdi:lan-connect"

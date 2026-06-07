@@ -17,6 +17,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import CONF_COMBINED_GROUPS, CONF_GROUP_NAME, DOMAIN
 from .coordinator import EntityAvailabilityCoordinator
+from .write_dedup import WriteDedupMixin
 
 
 async def async_setup_entry(
@@ -42,12 +43,15 @@ async def async_setup_entry(
     )
 
 
-class CombinedGroupAnyOfflineBinarySensor(BinarySensorEntity):
+class CombinedGroupAnyOfflineBinarySensor(WriteDedupMixin, BinarySensorEntity):
     """Binary sensor: ON when any entity across included groups is offline."""
 
     _attr_device_class = BinarySensorDeviceClass.PROBLEM
     _attr_icon = "mdi:alert"
     _attr_has_entity_name = True
+
+    def _ea_current_value(self) -> Any:
+        return self.is_on
 
     def __init__(
         self,
@@ -80,7 +84,8 @@ class CombinedGroupAnyOfflineBinarySensor(BinarySensorEntity):
 
         @callback
         def _on_coordinator_update() -> None:
-            self.async_write_ha_state()
+            if self._ea_should_write():
+                self.async_write_ha_state()
 
         for coordinator in self._coordinators:
             self._unsub_listeners.append(

@@ -21,6 +21,7 @@ from .const import (
     DOMAIN,
 )
 from .coordinator import EntityAvailabilityCoordinator
+from .write_dedup import WriteDedupMixin
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -81,10 +82,13 @@ def _friendly_name(hass: HomeAssistant, entity_id: str) -> str:
     return entity_id.split(".")[-1].replace("_", " ").title()
 
 
-class CombinedSensorBase(SensorEntity):
+class CombinedSensorBase(WriteDedupMixin, SensorEntity):
     """Base class for combined group sensors — handles coordinator subscriptions."""
 
     _attr_has_entity_name = True
+
+    def _ea_current_value(self) -> Any:
+        return self.native_value
 
     def __init__(
         self,
@@ -106,7 +110,8 @@ class CombinedSensorBase(SensorEntity):
     async def async_added_to_hass(self) -> None:
         @callback
         def _on_coordinator_update() -> None:
-            self.async_write_ha_state()
+            if self._ea_should_write():
+                self.async_write_ha_state()
 
         for coordinator in self._coordinators:
             self._unsub_listeners.append(

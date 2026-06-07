@@ -5,18 +5,15 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from homeassistant.components.binary_sensor import (
-    BinarySensorDeviceClass,
-    BinarySensorEntity,
-)
+from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 
 from .const import CONF_ENTRY_TYPE, CONF_GROUP_NAME, DOMAIN, ENTRY_TYPE_COMBINED
 from .coordinator import EntityAvailabilityCoordinator
+from .write_dedup import DedupCoordinatorBinarySensor
 
 
 async def async_setup_entry(
@@ -42,9 +39,7 @@ async def async_setup_entry(
     )
 
 
-class AnyOfflineBinarySensor(
-    CoordinatorEntity[EntityAvailabilityCoordinator], BinarySensorEntity
-):
+class AnyOfflineBinarySensor(DedupCoordinatorBinarySensor):
     """Binary sensor: ON when at least one entity is offline (problem detected)."""
 
     _attr_device_class = BinarySensorDeviceClass.PROBLEM
