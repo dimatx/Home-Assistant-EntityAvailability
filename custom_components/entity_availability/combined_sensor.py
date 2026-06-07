@@ -122,6 +122,7 @@ class CombinedSensorBase(WriteDedupMixin, SensorEntity):
         for unsub in self._unsub_listeners:
             unsub()
         self._unsub_listeners.clear()
+        self._ea_reset_cache()
 
     def _active_coordinators(self) -> list[EntityAvailabilityCoordinator]:
         domain_data = self.hass.data.get(DOMAIN, {})
