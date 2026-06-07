@@ -23,6 +23,7 @@ Monitor entity availability across your Home Assistant setup. Track offline enti
 - Customizable availability bar colors and thresholds
 - Optional suppress/unsuppress action buttons in card
 - Survives HA restarts — history persisted via HA Store, no recorder dependency; startup false-positive alerts suppressed for 60 seconds
+- Recorder-friendly writes — sensors only publish when value, attributes, or availability actually change, so steady-state networks don't generate redundant history rows every coordinator tick
 
 ## Setup
 
