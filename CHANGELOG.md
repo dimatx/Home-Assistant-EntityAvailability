@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-## [0.4.0-beta.1] - 2026-06-07
+## [0.3.6-beta.1] - 2026-06-07
 
 ### Changed
 - Sensor/BinarySensor: skip `async_write_ha_state` when both the native value and `extra_state_attributes` match the previously published pair. The coordinator still ticks every 30 seconds, but unchanged sensors no longer produce redundant recorder rows. Steady-state networks should see a large drop in recorder writes for the offline-count, offline-entities, low-battery, group-summary, recently-offline, recently-recovered, any-offline binary sensor, and their combined-group counterparts. First write after startup always goes through; any change in value or attrs still publishes immediately.
