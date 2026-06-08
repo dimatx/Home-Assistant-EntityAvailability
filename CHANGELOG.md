@@ -4,10 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-## [0.3.6-beta.1] - 2026-06-07
+## [0.3.6] - 2026-06-08
 
 ### Changed
 - Sensor/BinarySensor: skip `async_write_ha_state` when both the native value and `extra_state_attributes` match the previously published pair. The coordinator still ticks every 30 seconds, but unchanged sensors no longer produce redundant recorder rows. Steady-state networks should see a large drop in recorder writes for the offline-count, offline-entities, low-battery, group-summary, recently-offline, recently-recovered, any-offline binary sensor, and their combined-group counterparts. First write after startup always goes through; any change in value or attrs still publishes immediately.
+- Repo layout: moved screenshot/docs PNGs from `custom_components/entity_availability/docs/` to repo-root `assets/`. HACS clones the integration package into every user's `config/custom_components/` — non-runtime images now stay out of user installs.
+
+### Fixed
+- Sensor: include `available` in the dedup key and reset the cached pair on `async_will_remove_from_hass`, so availability flips and entity removal/re-add cycles always publish a fresh state.
 
 ## [0.3.5] - 2026-06-01
 
