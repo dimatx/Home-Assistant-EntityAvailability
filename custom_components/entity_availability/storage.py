@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from .const import BUCKET_INTERVAL, BUCKETS_MAX
@@ -92,8 +92,12 @@ class AvailabilityStorage:
         if entity_id not in self._buckets or not self._buckets[entity_id]:
             return None
 
-        window_hours = self._window_to_hours(window)
-        cutoff = now - timedelta(hours=window_hours)
+        if window == "today":
+            # Rolling 24h window — timezone-agnostic and consistent across DST changes.
+            cutoff = now - timedelta(hours=24)
+        else:
+            window_hours = self._window_to_hours(window)
+            cutoff = now - timedelta(hours=window_hours)
 
         relevant_buckets = [
             b for b in self._buckets[entity_id] if b.interval_start >= cutoff
@@ -109,8 +113,11 @@ class AvailabilityStorage:
             return None
 
         # Require at least 1 bucket for "today", 10% for longer windows
-        expected_buckets = window_hours * 12  # 12 buckets per hour
-        min_required = 1 if window == "today" else max(1, int(expected_buckets * 0.1))
+        if window == "today":
+            min_required = 1
+        else:
+            expected_buckets = window_hours * 12  # 12 buckets per hour
+            min_required = max(1, int(expected_buckets * 0.1))
         if len(relevant_buckets) < min_required:
             _LOGGER.debug(
                 "Insufficient data for %s window '%s': have %d buckets, need %d",
@@ -154,16 +161,22 @@ class AvailabilityStorage:
         storage = cls()
         for entity_id, buckets_data in data.items():
             buckets: list[AvailabilityBucket] = []
-            for b in buckets_data:
-                try:
-                    buckets.append(
-                        AvailabilityBucket(
-                            interval_start=datetime.fromisoformat(b["s"]),
-                            online_seconds=float(b["o"]),
+            try:
+                for b in buckets_data:
+                    try:
+                        online = float(b["o"])
+                        interval_start = datetime.fromisoformat(b["s"])
+                        if interval_start.tzinfo is None:
+                            interval_start = interval_start.replace(tzinfo=timezone.utc)
+                        bucket = AvailabilityBucket(
+                            interval_start=interval_start,
+                            online_seconds=min(online, float(BUCKET_INTERVAL)),
                         )
-                    )
-                except (KeyError, ValueError, TypeError):
-                    continue
+                        buckets.append(bucket)
+                    except (KeyError, ValueError, TypeError):
+                        continue
+            except TypeError:
+                continue
             storage._buckets[entity_id] = buckets
         return storage
 

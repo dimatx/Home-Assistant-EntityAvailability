@@ -28,6 +28,8 @@ async def async_setup_entry(
     """Set up combined group binary sensors."""
     group_name = entry.data[CONF_GROUP_NAME]
     group_slug = re.sub(r"[^a-z0-9_]+", "_", group_name.lower()).strip("_")
+    if not group_slug:
+        group_slug = entry.entry_id[:8].lower()
     combined_entry_ids: list[str] = entry.data.get(CONF_COMBINED_GROUPS, [])
 
     coordinators: list[EntityAvailabilityCoordinator] = [
@@ -49,6 +51,7 @@ class CombinedGroupAnyOfflineBinarySensor(WriteDedupMixin, BinarySensorEntity):
     _attr_device_class = BinarySensorDeviceClass.PROBLEM
     _attr_icon = "mdi:alert"
     _attr_has_entity_name = True
+    _attr_should_poll = False
 
     def _ea_current_value(self) -> Any:
         return self.is_on
@@ -101,7 +104,18 @@ class CombinedGroupAnyOfflineBinarySensor(WriteDedupMixin, BinarySensorEntity):
 
     def _active_coordinators(self) -> list[EntityAvailabilityCoordinator]:
         domain_data = self.hass.data.get(DOMAIN, {})
-        return [c for c in self._coordinators if c.entry.entry_id in domain_data]
+        return [
+            c
+            for c in self._coordinators
+            if isinstance(
+                domain_data.get(c.entry.entry_id), EntityAvailabilityCoordinator
+            )
+        ]
+
+    @property
+    def available(self) -> bool:
+        """Return False when all source coordinators have been unloaded."""
+        return len(self._active_coordinators()) > 0
 
     @property
     def is_on(self) -> bool:

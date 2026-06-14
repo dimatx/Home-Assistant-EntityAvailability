@@ -1,9 +1,9 @@
 /**
- * Entity Availability Card v0.3.5
+ * Entity Availability Card v0.3.7
  * Custom Lovelace card for the Home Assistant Entity Availability integration.
  */
 
-const CARD_VERSION = "0.3.5";
+const CARD_VERSION = "0.3.7";
 
 console.info(
   `%c ENTITY-AVAILABILITY-CARD %c v${CARD_VERSION} %c — github.com/italo-lombardi `,
@@ -621,7 +621,7 @@ class EntityAvailabilityCard extends LitElement {
           ${this._renderHeader(title, statusColor, statusText)}
           <div class="divider"></div>
           ${this._renderStats(online, offline, lowBattery, suppressed)}
-          ${suppressed > 0 ? html`<div class="suppressed-banner">${suppressed} entity${suppressed > 1 ? "ies" : ""} suppressed</div>` : nothing}
+          ${suppressed > 0 ? html`<div class="suppressed-banner">${suppressed} ${suppressed > 1 ? "entities" : "entity"} suppressed</div>` : nothing}
           ${this._config.show_entities ? this._renderCombinedGroupBreakdown(groups) : nothing}
         </ha-card>
       `;
@@ -668,7 +668,7 @@ class EntityAvailabilityCard extends LitElement {
         ${this._renderHeader(title, statusColor, statusText)}
         <div class="divider"></div>
         ${this._renderStats(online, offline, lowBattery, suppressed)}
-        ${suppressed > 0 ? html`<div class="suppressed-banner">${suppressed} entity${suppressed > 1 ? "ies" : ""} suppressed</div>` : nothing}
+        ${suppressed > 0 ? html`<div class="suppressed-banner">${suppressed} ${suppressed > 1 ? "entities" : "entity"} suppressed</div>` : nothing}
         ${this._config.show_availability ? this._renderAvailability(prefix) : nothing}
         ${this._config.show_entities ? this._renderEntityList(entities, batteryLevels, suppressedUntil, staleEntities, offlineSince, total, lowBatteryEntities) : nothing}
         ${this._config.show_actions ? this._renderActions(prefix) : nothing}
@@ -801,7 +801,9 @@ class EntityAvailabilityCard extends LitElement {
     if (entries.length === 0) return nothing;
 
     const sortBy = this._config.group_sort_by || "name_asc";
-    entries.sort(([nameA, gA], [nameB, gB]) => {
+    entries.sort(([, gA], [, gB]) => {
+      const nameA = gA.name ?? "";
+      const nameB = gB.name ?? "";
       if (sortBy === "name_desc") return nameB.localeCompare(nameA);
       if (sortBy === "offline_desc") {
         const diff = (gB.offline ?? 0) - (gA.offline ?? 0);
@@ -825,9 +827,9 @@ class EntityAvailabilityCard extends LitElement {
           <span style="text-align:center">Offline</span>
           <span style="text-align:center">Bat.</span>
         </div>
-        ${entries.map(([name, g]) => html`
+        ${entries.map(([, g]) => html`
           <div class="group-breakdown-row">
-            <span class="group-breakdown-name">${name}</span>
+            <span class="group-breakdown-name">${g.name ?? ""}</span>
             <span class="group-breakdown-count online">${g.online ?? 0}</span>
             <span class="group-breakdown-count ${g.offline > 0 ? "offline" : "neutral"}">${g.offline ?? 0}</span>
             <span class="group-breakdown-count ${g.low_battery > 0 ? "battery" : "neutral"}">${g.low_battery ?? 0}</span>
@@ -1126,8 +1128,14 @@ class EntityAvailabilityCard extends LitElement {
 
   async _handleUnsuppressAll(e) {
     e.stopPropagation();
-    const prefix = `entity_availability_${this._config.group}`;
-    const summary = this._getEntity(`sensor.${prefix}_group_summary`);
+    const isCombined = this._isCombinedGroup();
+    const prefix = isCombined
+      ? `entity_availability_combined_${this._config.group}`
+      : `entity_availability_${this._config.group}`;
+    const summaryId = isCombined
+      ? `sensor.${prefix}_combined_summary`
+      : `sensor.${prefix}_group_summary`;
+    const summary = this._getEntity(summaryId);
     const entities = summary?.attributes?.entities || [];
     for (const entityId of entities) {
       await this.hass.callService("entity_availability", "unsuppress", {

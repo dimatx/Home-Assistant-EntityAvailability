@@ -577,14 +577,23 @@ async def test_debounce_cancel_on_rapid_state_changes(
             "custom_components.entity_availability.coordinator.async_call_later",
             side_effect=[first_cancel, second_cancel],
         ):
+            entity_id = "binary_sensor.test"
+
+            def make_event(eid):
+                evt = MagicMock()
+                evt.data.get.side_effect = lambda key, default=None: (
+                    eid if key == "entity_id" else None
+                )
+                return evt
+
             # First state change — schedules debounce, no previous cancel
-            coord._handle_state_change(MagicMock())
-            assert coord._debounce_cancel is first_cancel
+            coord._handle_state_change(make_event(entity_id))
+            assert coord._debounce_cancel_map.get(entity_id) is first_cancel
             assert len(cancel_calls) == 0
 
             # Second rapid state change — cancels first, schedules new
-            coord._handle_state_change(MagicMock())
-            assert coord._debounce_cancel is second_cancel
+            coord._handle_state_change(make_event(entity_id))
+            assert coord._debounce_cancel_map.get(entity_id) is second_cancel
             assert len(cancel_calls) == 1  # first cancel was called
 
 
@@ -680,6 +689,60 @@ async def test_suppressed_entity_skips_availability_storage(
     assert record_offline_calls == [], (
         "suppressed entity should not record offline time"
     )
+
+
+async def test_async_shutdown_cancels_debounce_map(
+    mock_hass: HomeAssistant, mock_config_entry
+) -> None:
+    """async_shutdown calls every cancel in _debounce_cancel_map and clears it."""
+    hass = mock_hass
+
+    with patch.object(
+        EntityAvailabilityCoordinator, "_async_save_storage", new_callable=AsyncMock
+    ):
+        coord = EntityAvailabilityCoordinator(hass, mock_config_entry)
+        coord._last_update = None
+        await coord._async_update_data()
+
+        cancel_called = []
+
+        def fake_cancel():
+            cancel_called.append(True)
+
+        coord._debounce_cancel_map["binary_sensor.x"] = fake_cancel
+
+        await coord.async_shutdown()
+
+    assert len(cancel_called) == 1
+    assert coord._debounce_cancel_map == {}
+
+
+async def test_async_update_data_save_error_logs_warning(
+    mock_hass: HomeAssistant, mock_config_entry
+) -> None:
+    """When _async_save_storage raises, a warning is logged and _update_count resets."""
+    hass = mock_hass
+
+    from custom_components.entity_availability.coordinator import _SAVE_INTERVAL_UPDATES
+
+    with patch.object(
+        EntityAvailabilityCoordinator, "_async_save_storage", new_callable=AsyncMock
+    ) as mock_save:
+        coord = EntityAvailabilityCoordinator(hass, mock_config_entry)
+        coord._last_update = None
+        await coord._async_update_data()
+
+        # Prime the counter so the next update triggers the save path
+        coord._update_count = _SAVE_INTERVAL_UPDATES - 1
+        mock_save.side_effect = RuntimeError("disk full")
+
+        with patch(
+            "custom_components.entity_availability.coordinator._LOGGER"
+        ) as mock_logger:
+            await coord._async_update_data()
+
+        mock_logger.warning.assert_called_once()
+        assert coord._update_count == 0
 
 
 async def test_device_state_persistence_prevents_restart_retrigger(
@@ -1217,6 +1280,70 @@ async def test_save_storage_skips_suppression_for_removed_entities(
     assert "binary_sensor.device_removed" not in saved["suppressed"]
 
 
+async def test_load_storage_naive_offline_since_gets_utc(
+    mock_hass: HomeAssistant, mock_config_entry
+) -> None:
+    """Naive offline_since ISO string is restored with tzinfo=UTC."""
+    hass = mock_hass
+    naive_ts = (datetime.now(timezone.utc) - timedelta(minutes=5)).replace(tzinfo=None)
+
+    stored_data = {
+        "availability": {},
+        "suppressed": {},
+        "device_states": {
+            "binary_sensor.device_a": {
+                "is_offline": True,
+                "offline_since": naive_ts.isoformat(),
+                "cooldown_start": None,
+                "recently_offline_at": None,
+            }
+        },
+    }
+
+    coord = EntityAvailabilityCoordinator(hass, mock_config_entry)
+    coord._store = MagicMock()
+    coord._store.async_load = AsyncMock(return_value=stored_data)
+    coord._store.async_save = AsyncMock()
+
+    await coord._async_load_storage()
+
+    device = coord._device_states["binary_sensor.device_a"]
+    assert device.offline_since is not None
+    assert device.offline_since.tzinfo is not None
+
+
+async def test_load_storage_naive_cooldown_start_gets_utc(
+    mock_hass: HomeAssistant, mock_config_entry
+) -> None:
+    """Naive cooldown_start ISO string is restored with tzinfo=UTC."""
+    hass = mock_hass
+    naive_ts = (datetime.now(timezone.utc) - timedelta(seconds=30)).replace(tzinfo=None)
+
+    stored_data = {
+        "availability": {},
+        "suppressed": {},
+        "device_states": {
+            "binary_sensor.device_a": {
+                "is_offline": False,
+                "offline_since": None,
+                "cooldown_start": naive_ts.isoformat(),
+                "recently_offline_at": None,
+            }
+        },
+    }
+
+    coord = EntityAvailabilityCoordinator(hass, mock_config_entry)
+    coord._store = MagicMock()
+    coord._store.async_load = AsyncMock(return_value=stored_data)
+    coord._store.async_save = AsyncMock()
+
+    await coord._async_load_storage()
+
+    device = coord._device_states["binary_sensor.device_a"]
+    assert device.cooldown_start is not None
+    assert device.cooldown_start.tzinfo is not None
+
+
 # ---------------------------------------------------------------------------
 # Battery detection — device_class=battery entity reads own state
 # ---------------------------------------------------------------------------
@@ -1465,7 +1592,7 @@ async def test_shutdown_cancels_state_change_listener(
 async def test_shutdown_cancels_debounce(
     mock_hass: HomeAssistant, mock_config_entry
 ) -> None:
-    """async_shutdown cancels the debounce timer when it exists."""
+    """async_shutdown cancels all per-entity debounce timers."""
     hass = mock_hass
 
     with patch.object(
@@ -1478,17 +1605,50 @@ async def test_shutdown_cancels_debounce(
     def debounce_cancel():
         debounce_called.append(True)
 
-    coord._debounce_cancel = debounce_cancel
+    coord._debounce_cancel_map["binary_sensor.device_a"] = debounce_cancel
     coord._dirty = False
     await coord.async_shutdown()
 
     assert len(debounce_called) == 1
-    assert coord._debounce_cancel is None
+    assert len(coord._debounce_cancel_map) == 0
 
 
 # ---------------------------------------------------------------------------
 # _async_load_storage — timed suppression restore (lines 187-198)
 # ---------------------------------------------------------------------------
+
+
+async def test_load_storage_restores_naive_recently_offline_at(
+    mock_hass: HomeAssistant, mock_config_entry
+) -> None:
+    """Naive (no tzinfo) recently_offline_at within recovery window is restored."""
+    hass = mock_hass
+    # Naive isoformat — within default 5-minute window
+    naive_ts = (datetime.now(timezone.utc) - timedelta(minutes=2)).replace(tzinfo=None)
+
+    stored_data = {
+        "availability": {},
+        "suppressed": {},
+        "device_states": {
+            "binary_sensor.device_a": {
+                "is_offline": True,
+                "offline_since": None,
+                "cooldown_start": None,
+                "recently_offline_at": naive_ts.isoformat(),
+            }
+        },
+    }
+
+    coord = EntityAvailabilityCoordinator(hass, mock_config_entry)
+    coord._store = MagicMock()
+    coord._store.async_load = AsyncMock(return_value=stored_data)
+    coord._store.async_save = AsyncMock()
+
+    await coord._async_load_storage()
+
+    device = coord._device_states["binary_sensor.device_a"]
+    assert device.recently_offline_at is not None
+    assert device.recently_offline_at.tzinfo is not None
 
 
 async def test_load_storage_restores_future_timed_suppression(
@@ -1544,6 +1704,33 @@ async def test_load_storage_discards_expired_timed_suppression(
     await coord._async_load_storage()
 
     assert "binary_sensor.device_a" not in coord._suppressed
+
+
+async def test_load_storage_restores_naive_timed_suppression(
+    mock_hass: HomeAssistant, mock_config_entry
+) -> None:
+    """Naive (no tzinfo) suppress_until ISO string is treated as UTC and restored."""
+    hass = mock_hass
+
+    stored_data = {
+        "availability": {},
+        "suppressed": {
+            "binary_sensor.device_a": "2099-01-01T12:00:00",  # naive — far future
+        },
+        "device_states": {},
+    }
+
+    coord = EntityAvailabilityCoordinator(hass, mock_config_entry)
+    coord._store = MagicMock()
+    coord._store.async_load = AsyncMock(return_value=stored_data)
+    coord._store.async_save = AsyncMock()
+
+    await coord._async_load_storage()
+
+    assert "binary_sensor.device_a" in coord._suppressed
+    restored = coord._suppressed["binary_sensor.device_a"]
+    assert restored is not None
+    assert restored.tzinfo is not None
 
 
 async def test_load_storage_ignores_invalid_suppression_timestamp(
@@ -1753,12 +1940,12 @@ async def test_debounced_refresh_callback_creates_task(
 
     assert len(captured_callbacks) == 1
 
-    # Now invoke the callback: _debounce_cancel should be cleared and refresh scheduled
+    # Now invoke the callback: entry removed from map and refresh scheduled
     with patch.object(coord, "async_request_refresh", new_callable=AsyncMock):
         with patch.object(hass, "async_create_task") as mock_task:
             captured_callbacks[0](None)  # simulate the timer firing
 
-    assert coord._debounce_cancel is None
+    assert "unknown" not in coord._debounce_cancel_map
     mock_task.assert_called_once()
 
 

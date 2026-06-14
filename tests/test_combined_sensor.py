@@ -291,8 +291,9 @@ class TestCombinedGroupSensor:
         assert attrs["online"] == 2
         assert "binary_sensor.a2" in attrs["offline_entities"]
         assert "groups" in attrs
-        assert "Group A" in attrs["groups"]
-        assert "Group B" in attrs["groups"]
+        assert "entry_a" in attrs["groups"]
+        assert "entry_b" in attrs["groups"]
+        assert attrs["groups"]["entry_a"]["name"] == "Group A"
 
     def test_attributes_battery_powered_via_device_states(
         self, mock_hass, combined_entry, coordinators
@@ -307,8 +308,8 @@ class TestCombinedGroupSensor:
         sensor = self._sensor(mock_hass, combined_entry, coordinators)
         attrs = sensor.extra_state_attributes
         assert attrs["battery_powered"] == 2
-        assert attrs["groups"]["Group A"]["battery_powered"] == 1
-        assert attrs["groups"]["Group B"]["battery_powered"] == 1
+        assert attrs["groups"]["entry_a"]["battery_powered"] == 1
+        assert attrs["groups"]["entry_b"]["battery_powered"] == 1
 
     def test_attributes_battery_powered_via_battery_map(
         self, mock_hass, group_entry_a, group_entry_b, coordinators
@@ -364,8 +365,8 @@ class TestCombinedGroupSensor:
         )
         attrs = sensor.extra_state_attributes
         # Group A: 1 non-None value in map; Group B: no map → 0
-        assert attrs["groups"]["Group A"]["battery_powered"] == 1
-        assert attrs["groups"]["Group B"]["battery_powered"] == 0
+        assert attrs["groups"]["entry_a"]["battery_powered"] == 1
+        assert attrs["groups"]["entry_b"]["battery_powered"] == 0
         assert attrs["battery_powered"] == 1
 
     def test_attributes_battery_powered_zero_when_no_battery(
@@ -1100,3 +1101,34 @@ async def test_combined_sensor_setup_entry_slug_sanitizes_slash_in_group_name(
         assert "/" not in entity.entity_id, (
             f"entity_id '{entity.entity_id}' contains forward slash"
         )
+
+
+async def test_combined_sensor_slug_fallback(
+    mock_hass: HomeAssistant, group_entry_a, group_entry_b
+) -> None:
+    """All-special-char group name falls back to entry_id[:8] for the slug."""
+    combined_entry = _make_combined_entry(
+        "abcdef1234567890",
+        "!!!",
+        ["entry_a", "entry_b"],
+    )
+    coord_a = MagicMock(spec=EntityAvailabilityCoordinator)
+    coord_a.entry = group_entry_a
+    coord_b = MagicMock(spec=EntityAvailabilityCoordinator)
+    coord_b.entry = group_entry_b
+    mock_hass.data[DOMAIN] = {"entry_a": coord_a, "entry_b": coord_b}
+
+    group_entry_a.add_to_hass(mock_hass)
+    group_entry_b.add_to_hass(mock_hass)
+    combined_entry.add_to_hass(mock_hass)
+
+    added = []
+
+    def _fake_add(entities):
+        added.extend(entities)
+
+    await async_setup_entry(mock_hass, combined_entry, _fake_add)
+
+    assert len(added) > 0
+    for entity in added:
+        assert "abcdef12" in entity.entity_id

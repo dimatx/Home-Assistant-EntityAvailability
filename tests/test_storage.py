@@ -371,3 +371,34 @@ class TestGetAvailabilityEdgeCases:
 
         result = storage.get_availability("sensor.test", "today", now)
         assert result is None
+
+
+# ---------------------------------------------------------------------------
+# from_dict — outer TypeError when buckets_data is not iterable (lines 168-169)
+# ---------------------------------------------------------------------------
+
+
+class TestFromDictOuterTypeError:
+    """Test from_dict outer except TypeError branch."""
+
+    def test_from_dict_non_iterable_buckets_data_skipped(self) -> None:
+        """from_dict skips entity when buckets_data is not iterable (e.g. None)."""
+        storage = AvailabilityStorage.from_dict({"sensor.test": None})
+        assert "sensor.test" not in storage._buckets
+
+    def test_from_dict_integer_buckets_data_skipped(self) -> None:
+        """from_dict skips entity when buckets_data is an integer."""
+        storage = AvailabilityStorage.from_dict({"sensor.test": 42})
+        assert "sensor.test" not in storage._buckets
+
+    def test_from_dict_naive_interval_start_gets_utc(self) -> None:
+        """from_dict normalizes naive interval_start to UTC-aware."""
+        from datetime import timezone
+
+        storage = AvailabilityStorage.from_dict(
+            {"sensor.test": [{"s": "2024-01-01T12:00:00", "o": 100.0}]}
+        )
+        assert "sensor.test" in storage._buckets
+        bucket = storage._buckets["sensor.test"][0]
+        assert bucket.interval_start.tzinfo is not None
+        assert bucket.interval_start.tzinfo == timezone.utc

@@ -36,6 +36,8 @@ async def async_setup_entry(
     """Set up combined group sensors."""
     group_name = entry.data[CONF_GROUP_NAME]
     group_slug = re.sub(r"[^a-z0-9_]+", "_", group_name.lower()).strip("_")
+    if not group_slug:
+        group_slug = entry.entry_id[:8].lower()
     combined_entry_ids: list[str] = entry.data.get(CONF_COMBINED_GROUPS, [])
 
     coordinators: list[EntityAvailabilityCoordinator] = [
@@ -108,6 +110,9 @@ class CombinedSensorBase(WriteDedupMixin, SensorEntity):
         self._unsub_listeners: list[Callable[[], None]] = []
 
     async def async_added_to_hass(self) -> None:
+        """Subscribe to all included coordinators."""
+        await super().async_added_to_hass()
+
         @callback
         def _on_coordinator_update() -> None:
             if self._ea_should_write():
@@ -119,14 +124,22 @@ class CombinedSensorBase(WriteDedupMixin, SensorEntity):
             )
 
     async def async_will_remove_from_hass(self) -> None:
+        """Unsubscribe from all coordinators."""
         for unsub in self._unsub_listeners:
             unsub()
         self._unsub_listeners.clear()
         self._ea_reset_cache()
+        await super().async_will_remove_from_hass()
 
     def _active_coordinators(self) -> list[EntityAvailabilityCoordinator]:
         domain_data = self.hass.data.get(DOMAIN, {})
-        return [c for c in self._coordinators if c.entry.entry_id in domain_data]
+        return [
+            c
+            for c in self._coordinators
+            if isinstance(
+                domain_data.get(c.entry.entry_id), EntityAvailabilityCoordinator
+            )
+        ]
 
 
 class CombinedGroupSensor(CombinedSensorBase):
@@ -186,7 +199,9 @@ class CombinedGroupSensor(CombinedSensorBase):
                 g_battery_powered = sum(1 for v in battery_map.values() if v)
             else:
                 g_battery_powered = sum(
-                    1 for d in states.values() if d.battery_level is not None
+                    1
+                    for d in states.values()
+                    if d.battery_level is not None and not d.is_suppressed
                 )
             total += g_total
             online += g_online
@@ -206,7 +221,8 @@ class CombinedGroupSensor(CombinedSensorBase):
                 if d.is_degraded and not d.is_suppressed and d.battery_level is not None
             ]
             gname = coord.group_name
-            groups[gname] = {
+            groups[coord.entry.entry_id] = {
+                "name": gname,
                 "total": g_total,
                 "online": g_online,
                 "offline": g_offline,

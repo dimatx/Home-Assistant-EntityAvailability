@@ -80,7 +80,7 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
         self._last_update: datetime | None = None
         self._startup_time: datetime | None = None
         self._unsub_state_change: CALLBACK_TYPE | None = None
-        self._debounce_cancel: CALLBACK_TYPE | None = None
+        self._debounce_cancel_map: dict[str, CALLBACK_TYPE] = {}
         self._device_states: dict[str, DeviceState] = {}
         self._suppressed: dict[str, datetime | None] = {}
         self._update_count: int = 0
@@ -153,9 +153,9 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
         if self._unsub_state_change is not None:
             self._unsub_state_change()
             self._unsub_state_change = None
-        if self._debounce_cancel is not None:
-            self._debounce_cancel()
-            self._debounce_cancel = None
+        for cancel in self._debounce_cancel_map.values():
+            cancel()
+        self._debounce_cancel_map.clear()
         # Final save
         if self._dirty:
             _LOGGER.debug("[%s] Saving dirty storage on shutdown", self.group_name)
@@ -186,6 +186,8 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
                     else:
                         try:
                             until = datetime.fromisoformat(until_str)
+                            if until.tzinfo is None:
+                                until = until.replace(tzinfo=timezone.utc)
                             if until > datetime.now(timezone.utc):
                                 self._suppressed[entity_id] = until
                                 _LOGGER.debug(
@@ -201,25 +203,33 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
                     device = DeviceState(entity_id=entity_id)
                     device.is_offline = ds.get("is_offline", False)
                     try:
-                        device.offline_since = (
-                            datetime.fromisoformat(ds["offline_since"])
-                            if ds.get("offline_since")
-                            else None
-                        )
+                        raw_os = ds.get("offline_since")
+                        if raw_os:
+                            ts = datetime.fromisoformat(raw_os)
+                            if ts.tzinfo is None:
+                                ts = ts.replace(tzinfo=timezone.utc)
+                            device.offline_since = ts
+                        else:
+                            device.offline_since = None
                     except (ValueError, TypeError):
                         device.offline_since = None
                     try:
-                        device.cooldown_start = (
-                            datetime.fromisoformat(ds["cooldown_start"])
-                            if ds.get("cooldown_start")
-                            else None
-                        )
+                        raw_cs = ds.get("cooldown_start")
+                        if raw_cs:
+                            ts = datetime.fromisoformat(raw_cs)
+                            if ts.tzinfo is None:
+                                ts = ts.replace(tzinfo=timezone.utc)
+                            device.cooldown_start = ts
+                        else:
+                            device.cooldown_start = None
                     except (ValueError, TypeError):
                         device.cooldown_start = None
                     try:
                         raw = ds.get("recently_offline_at")
                         if raw:
                             ts = datetime.fromisoformat(raw)
+                            if ts.tzinfo is None:
+                                ts = ts.replace(tzinfo=timezone.utc)
                             window_seconds = (
                                 self.entry.data.get(
                                     CONF_RECOVERY_WINDOW, DEFAULT_RECOVERY_WINDOW
@@ -241,7 +251,11 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
         for entity_id, device in self._device_states.items():
             if entity_id not in self._entities:
                 continue
-            if device.is_offline or device.cooldown_start is not None:
+            if (
+                device.is_offline
+                or device.cooldown_start is not None
+                or device.recently_offline_at is not None
+            ):
                 device_states_data[entity_id] = {
                     "is_offline": device.is_offline,
                     "offline_since": device.offline_since.isoformat()
@@ -290,7 +304,7 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
 
     @callback
     def _handle_state_change(self, event: Event) -> None:
-        """Handle state change for a monitored entity (debounced)."""
+        """Handle state change for a monitored entity (debounced per entity)."""
         entity_id = event.data.get("entity_id", "unknown")
         new_state = event.data.get("new_state")
         old_state = event.data.get("old_state")
@@ -301,18 +315,20 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
             old_state.state if old_state else "None",
             new_state.state if new_state else "None",
         )
-        # Cancel any pending debounce timer
-        if self._debounce_cancel is not None:
-            self._debounce_cancel()
+        # Per-entity debounce: cancel only this entity's pending timer.
+        # A shared group-wide timer would drop all but the last entity's
+        # state change when multiple entities change within the debounce window.
+        existing = self._debounce_cancel_map.get(entity_id)
+        if existing is not None:
+            existing()
 
         @callback
         def _debounced_refresh(_now: Any) -> None:
             """Trigger a coordinator refresh after debounce."""
-            self._debounce_cancel = None
+            self._debounce_cancel_map.pop(entity_id, None)
             self.hass.async_create_task(self.async_request_refresh())
 
-        # Schedule a debounced refresh
-        self._debounce_cancel = async_call_later(
+        self._debounce_cancel_map[entity_id] = async_call_later(
             self.hass, _STATE_CHANGE_DEBOUNCE, _debounced_refresh
         )
 
@@ -351,9 +367,13 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
                     device.is_suppressed = False
                     device.suppress_until = None
                     self._suppressed.pop(entity_id, None)
+                    self._dirty = True
 
-            # Skip suppressed devices for availability tracking
+            # Skip suppressed devices for availability tracking;
+            # clear degraded/stale flags so suppressed entities don't surface
             if device.is_suppressed:
+                device.is_degraded = False
+                device.is_stale = False
                 _LOGGER.debug(
                     "[%s] Skipping suppressed entity %s (until=%s)",
                     self.group_name,
@@ -464,8 +484,13 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
                 self._availability_storage.record_online(entity_id, elapsed, now)
 
             # Record offline time (offline seconds are implicitly tracked
-            # as total_seconds - online_seconds in the bucket)
-            if device.is_offline:
+            # as total_seconds - online_seconds in the bucket).
+            # Skip if still in cooldown — recorded as online above.
+            if device.is_offline and not (
+                is_bad
+                and device.cooldown_start is not None
+                and (now - device.cooldown_start).total_seconds() < self._cooldown
+            ):
                 self._availability_storage.record_offline(entity_id, elapsed, now)
 
             # Degraded = not offline but battery low or stale
@@ -476,12 +501,19 @@ class EntityAvailabilityCoordinator(DataUpdateCoordinator[EntityAvailabilityData
         self._dirty = True
         self._update_count += 1
         if self._update_count >= _SAVE_INTERVAL_UPDATES:
-            self._update_count = 0
-            await self._async_save_storage()
+            try:
+                await self._async_save_storage()
+            except Exception:  # noqa: BLE001
+                _LOGGER.warning(
+                    "[%s] Failed to save storage — will retry next interval",
+                    self.group_name,
+                )
+            finally:
+                self._update_count = 0
 
         return EntityAvailabilityData(
-            devices=self._device_states,
-            buckets=self._availability_storage.buckets,
+            devices=dict(self._device_states),
+            buckets=dict(self._availability_storage.buckets),
         )
 
     def _get_battery_level(self, entity_id: str) -> int | None:
