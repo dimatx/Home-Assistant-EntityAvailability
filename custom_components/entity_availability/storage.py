@@ -119,13 +119,6 @@ class AvailabilityStorage:
             expected_buckets = window_hours * 12  # 12 buckets per hour
             min_required = max(1, int(expected_buckets * 0.1))
         if len(relevant_buckets) < min_required:
-            _LOGGER.debug(
-                "Insufficient data for %s window '%s': have %d buckets, need %d",
-                entity_id,
-                window,
-                len(relevant_buckets),
-                min_required,
-            )
             return None
 
         total_online = sum(b.online_seconds for b in relevant_buckets)
