@@ -475,6 +475,82 @@ def test_availability_sensor_dedup_skips_unchanged(mock_coordinator, mock_hass) 
     assert write.call_count == 1
 
 
+def test_availability_sensor_dedup_catches_sub_percent_drift(
+    mock_coordinator, mock_hass
+) -> None:
+    """v5.5 F-EA-1: sub-0.1% rolling-window drift must not defeat dedup.
+
+    Pre-fix, ``extra_state_attributes['per_device']`` returned unrounded
+    floats that drifted on every coordinator tick, defeating
+    ``WriteDedupMixin`` and producing one recorder row per tick
+    (~2880/day per ``_today`` sensor). Post-fix the per_device values are
+    rounded to 1 decimal (matching ``native_value``); sub-0.1% drift
+    collapses below the rounding step so dedup wins on virtually every tick.
+    """
+    sensor = AvailabilitySensor(
+        mock_coordinator, "Test Group", "test_group", "today", "eid"
+    )
+    sensor.hass = mock_hass
+    storage = mock_coordinator.availability_storage
+    tick = {"n": 0}
+
+    def _drifting(_eid, _window, _now):
+        return 99.5 + (tick["n"] * 30 / 86400)
+
+    with (
+        patch.object(storage, "get_availability", side_effect=_drifting),
+        patch.object(sensor, "async_write_ha_state") as write,
+    ):
+        for i in range(1000):
+            tick["n"] = i
+            sensor._handle_coordinator_update()
+
+    assert write.call_count < 10, (
+        f"sub-0.1% drift defeated dedup: {write.call_count}/1000 writes"
+    )
+
+
+def test_availability_sensor_dedup_writes_on_decimal_boundary(
+    mock_coordinator, mock_hass
+) -> None:
+    """Drift crossing a 0.1% boundary writes once per crossing.
+
+    Confirms the 1-decimal rounding actually flips at the boundary —
+    a stronger guarantee than the steady-state test in test_sensor.py.
+
+    Uses unambiguous mid-step values (99.03, 99.13, ...) to dodge
+    banker's-rounding + float-repr quirks at exact half-step points like
+    99.05 (stored as 99.0499... → rounds to 99.0, not 99.1).
+    """
+    sensor = AvailabilitySensor(
+        mock_coordinator, "Test Group", "test_group", "today", "eid"
+    )
+    sensor.hass = mock_hass
+    storage = mock_coordinator.availability_storage
+    tick = {"n": 0}
+
+    def _drifting(_eid, _window, _now):
+        # Step 0.1 per tick, offset 0.03 so each value sits cleanly inside a
+        # rounding bucket: 99.03 → 99.0, 99.13 → 99.1, 99.23 → 99.2, ...
+        return 99.03 + (tick["n"] * 0.1)
+
+    states_seen: set[float] = set()
+    with (
+        patch.object(storage, "get_availability", side_effect=_drifting),
+        patch.object(sensor, "async_write_ha_state") as write,
+    ):
+        for i in range(3):  # 99.03, 99.13, 99.23 → 99.0, 99.1, 99.2
+            tick["n"] = i
+            states_seen.add(sensor.native_value)
+            sensor._handle_coordinator_update()
+
+    # 3 distinct rounded values → 3 writes (one per crossing including init).
+    assert write.call_count == 3, (
+        f"expected 3 writes across 3 distinct 0.1% buckets, got {write.call_count}"
+    )
+    assert {99.0, 99.1, 99.2} == states_seen
+
+
 def test_dedup_sensor_first_write_after_construction(mock_coordinator) -> None:
     """A freshly constructed concrete sensor writes on its first refresh."""
     sensor = OfflineCountSensor(mock_coordinator, "Test Group", "test_group", "eid")

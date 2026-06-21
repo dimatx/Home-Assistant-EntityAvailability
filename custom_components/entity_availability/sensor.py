@@ -316,7 +316,7 @@ class AvailabilitySensor(DedupCoordinatorSensor):
 
     @property
     def native_value(self) -> float | None:
-        """Return group availability %."""
+        """Return group availability % (1-decimal precision)."""
         now = datetime.now(timezone.utc)
         storage = self.coordinator.availability_storage
 
@@ -337,7 +337,13 @@ class AvailabilitySensor(DedupCoordinatorSensor):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Return per-device availability breakdown."""
+        """Return per-device availability breakdown (1-decimal precision).
+
+        Per-device values are rounded to 1 decimal to match ``native_value``.
+        Previously they were unrounded floats that drifted by ~0.035% on every
+        coordinator tick, defeating ``WriteDedupMixin`` even when the
+        group-level rounded value was stable (v5.5 audit finding F-EA-1).
+        """
         now = datetime.now(timezone.utc)
         storage = self.coordinator.availability_storage
         breakdown: dict[str, float | None] = {}
@@ -346,7 +352,7 @@ class AvailabilitySensor(DedupCoordinatorSensor):
             if device and device.is_suppressed:
                 continue
             avail = storage.get_availability(entity_id, self._window, now)
-            breakdown[entity_id] = avail
+            breakdown[entity_id] = round(avail, 1) if avail is not None else None
         return {"per_device": breakdown}
 
 

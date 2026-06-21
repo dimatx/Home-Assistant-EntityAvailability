@@ -4,7 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-## [0.3.7] - TBD
+## [0.3.8] - 2026-06-21
+
+### Fixed
+- Sensor: `AvailabilitySensor.extra_state_attributes['per_device']` values are now rounded to 1 decimal (matching `native_value`). Previously the per-device floats were unrounded — the rolling-window numerator grew by ~`SCAN_INTERVAL` seconds per coordinator tick, so the unrounded value drifted by tens of thousandths of a percent every tick — defeating `WriteDedupMixin` (the attribute dict comparison always saw a diff) and producing one recorder row per tick on every `*_availability_today` sensor (~2880/day each). The group-level `native_value` was already 1-decimal-rounded; this matches the attribute precision to it. Public API unchanged: state is still a 1-decimal float. Fixes v5.5 audit finding F-EA-1 (1.45M states rows over 50 days).
+
+## [0.3.7] - 2026-06-15
 
 ### Fixed
 - Combined sensor: `sensor.*_combined_summary` attributes now include an `entities` key (flat list of all monitored entity IDs across all source groups) — required for the Unsuppress All card action to work on combined group cards
