@@ -21,6 +21,7 @@ from .const import (
     CONF_GROUP_NAME,
     CONF_USE_DEVICE_NAMES,
     DOMAIN,
+    NO_AREA_SENTINEL,
 )
 from .coordinator import EntityAvailabilityCoordinator
 from .helpers import resolve_area_name, resolve_display_name
@@ -611,8 +612,7 @@ class CombinedAffectedAreasCountSensor(CombinedSensorBase):
             for d in coord.device_states.values():
                 if d.is_offline and not d.is_suppressed:
                     area = resolve_area_name(self.hass, d.entity_id)
-                    if area:
-                        areas.add(area)
+                    areas.add(area if area else NO_AREA_SENTINEL)
         return len(areas)
 
 
@@ -645,6 +645,7 @@ class CombinedAffectedAreasSensor(CombinedSensorBase):
                     if area:
                         areas.add(area)
                     else:
+                        areas.add(NO_AREA_SENTINEL)
                         unassigned.append(d.entity_id)
         self._cached_areas = sorted(areas)
         self._cached_unassigned = unassigned
@@ -702,8 +703,7 @@ class CombinedAffectedAreasRecentlyOfflineSensor(CombinedSensorBase):
                     and (now - d.recently_offline_at).total_seconds() <= cutoff
                 ):
                     area = resolve_area_name(self.hass, d.entity_id)
-                    if area:
-                        areas.add(area)
+                    areas.add(area if area else NO_AREA_SENTINEL)
         return sorted(areas)
 
     @property
@@ -751,9 +751,7 @@ class CombinedAffectedAreasRecentlyRecoveredSensor(CombinedSensorBase):
             for d in coord.device_states.values():
                 if d.is_suppressed:
                     continue
-                area = resolve_area_name(self.hass, d.entity_id)
-                if not area:
-                    continue
+                area = resolve_area_name(self.hass, d.entity_id) or NO_AREA_SENTINEL
                 area_pairs.setdefault(area, []).append((coord, d))
 
         recovered: list[str] = []

@@ -26,6 +26,7 @@ from .const import (
     DEFAULT_BATTERY_THRESHOLD,
     DOMAIN,
     ENTRY_TYPE_COMBINED,
+    NO_AREA_SENTINEL,
 )
 from .coordinator import EntityAvailabilityCoordinator
 from .helpers import resolve_area_name, resolve_display_name
@@ -643,11 +644,10 @@ class AffectedAreasCountSensor(DedupCoordinatorSensor):
     @property
     def native_value(self) -> int:
         areas = {
-            resolve_area_name(self.hass, d.entity_id)
+            resolve_area_name(self.hass, d.entity_id) or NO_AREA_SENTINEL
             for d in self.coordinator.device_states.values()
             if d.is_offline and not d.is_suppressed
         }
-        areas.discard(None)
         return len(areas)
 
 
@@ -681,6 +681,7 @@ class AffectedAreasSensor(DedupCoordinatorSensor):
                 if area:
                     areas.add(area)
                 else:
+                    areas.add(NO_AREA_SENTINEL)
                     unassigned.append(d.entity_id)
         self._cached_areas = sorted(areas)
         self._cached_unassigned = unassigned
@@ -739,8 +740,7 @@ class AffectedAreasRecentlyOfflineSensor(DedupCoordinatorSensor):
                 and (now - d.recently_offline_at).total_seconds() <= cutoff
             ):
                 area = resolve_area_name(self.hass, d.entity_id)
-                if area:
-                    areas.add(area)
+                areas.add(area if area else NO_AREA_SENTINEL)
         self._cached_areas = sorted(areas)
         return self._cached_areas
 
@@ -789,14 +789,12 @@ class AffectedAreasRecentlyRecoveredSensor(DedupCoordinatorSensor):
         now = datetime.now(timezone.utc)
         cutoff = self.coordinator.recovery_window_minutes * 60
 
-        # Build area → list[DeviceState] for non-suppressed devices with an assigned area
+        # Build area → list[DeviceState] for non-suppressed devices
         area_devices: dict[str, list] = {}
         for d in self.coordinator.device_states.values():
             if d.is_suppressed:
                 continue
-            area = resolve_area_name(self.hass, d.entity_id)
-            if not area:
-                continue
+            area = resolve_area_name(self.hass, d.entity_id) or NO_AREA_SENTINEL
             area_devices.setdefault(area, []).append(d)
 
         recovered: list[str] = []

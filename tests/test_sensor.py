@@ -1729,8 +1729,8 @@ class TestAffectedAreasSensors:
             sensor.hass = mock_hass
             assert sensor.native_value == 1
 
-    def test_count_no_area_returns_zero(self, mock_coordinator, mock_hass):
-        """Offline entity with no area → count=0."""
+    def test_count_no_area_uses_sentinel(self, mock_coordinator, mock_hass):
+        """Offline entity with no area → counts as (No Area) sentinel → count=1."""
         with patch(
             "custom_components.entity_availability.sensor.resolve_area_name",
             return_value=None,
@@ -1739,7 +1739,7 @@ class TestAffectedAreasSensors:
                 mock_coordinator, "Test Group", "test_group", "test_entry_id"
             )
             sensor.hass = mock_hass
-            assert sensor.native_value == 0
+            assert sensor.native_value == 1
 
     def test_count_suppressed_excluded(self, mock_coordinator, mock_hass):
         """Suppressed offline entity excluded → count=0."""
@@ -1827,7 +1827,7 @@ class TestAffectedAreasSensors:
             sensor.native_value  # populate cache
             attrs = sensor.extra_state_attributes
         assert "binary_sensor.device_b" in attrs["unassigned_entities"]
-        assert attrs["count"] == 0
+        assert attrs["count"] == 1  # (No Area) sentinel appears in areas list
 
     def test_areas_truncation_at_255(self, mock_coordinator, mock_hass):
         """Long area list is truncated to MAX_STATE_LENGTH."""
@@ -2079,15 +2079,19 @@ class TestAffectedAreasSensors:
         assert len(value) <= MAX_STATE_LENGTH
         assert value.endswith("...")
 
-    def test_recently_recovered_no_area_skipped(self, mock_coordinator, mock_hass):
-        """Entity with no area is skipped in AffectedAreasRecentlyRecoveredSensor (line 799 branch)."""
+    def test_recently_recovered_no_area_uses_sentinel(
+        self, mock_coordinator, mock_hass
+    ):
+        """Entities with no area grouped under (No Area) sentinel; all online + recent recovery → sentinel qualifies."""
         from datetime import timedelta
 
         mock_coordinator._device_states["binary_sensor.device_b"].is_offline = False
         mock_coordinator._device_states["binary_sensor.device_b"].last_recovery = (
             datetime.now(timezone.utc) - timedelta(minutes=1)
         )
-        # Entities with no area → not added to area_devices → no areas qualify
+        # All entities have no area → all go into (No Area) bucket
+        # device_b is online with recent recovery; device_a, device_c are online with no recovery
+        # → (No Area) bucket: all online + recent recovery event → qualifies
         with patch(
             "custom_components.entity_availability.sensor.resolve_area_name",
             return_value=None,
@@ -2096,7 +2100,7 @@ class TestAffectedAreasSensors:
                 mock_coordinator, "Test Group", "test_group", "test_entry_id"
             )
             sensor.hass = mock_hass
-            assert sensor.native_value == "None"
+            assert sensor.native_value == "(No Area)"
 
     def test_recently_recovered_truncation(self, mock_coordinator, mock_hass):
         """Long area list in AffectedAreasRecentlyRecoveredSensor is truncated."""

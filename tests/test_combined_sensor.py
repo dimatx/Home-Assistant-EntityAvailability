@@ -1890,7 +1890,7 @@ class TestCombinedAffectedAreasSensors:
             sensor.native_value  # populate cache
             attrs = sensor.extra_state_attributes
         assert "binary_sensor.a2" in attrs["unassigned_entities"]
-        assert attrs["count"] == 0
+        assert attrs["count"] == 1  # (No Area) sentinel appears in areas list
 
     def test_recently_offline_none_when_no_match(
         self, mock_hass, combined_entry, coordinators
@@ -1946,10 +1946,10 @@ class TestCombinedAffectedAreasSensors:
         assert attrs["count"] == 1
         assert "Kitchen" in attrs["areas"]
 
-    def test_recently_recovered_no_area_entities_skipped(
+    def test_recently_recovered_no_area_uses_sentinel(
         self, mock_hass, combined_entry, coordinators
     ):
-        """Entities with no area are skipped in CombinedAffectedAreasRecentlyRecoveredSensor."""
+        """Entities with no area grouped under (No Area) sentinel; all online + recent recovery → sentinel qualifies."""
         mock_hass.data[DOMAIN] = {
             "entry_a": coordinators[0],
             "entry_b": coordinators[1],
@@ -1958,6 +1958,9 @@ class TestCombinedAffectedAreasSensors:
         coordinators[0]._device_states["binary_sensor.a2"].last_recovery = (
             _NOW - timedelta(minutes=1)
         )
+        # All non-suppressed entities in (No Area) bucket must be online
+        # a1 is already online, a2 now online with recovery, b1 online
+        # → (No Area) all online + recent recovery → qualifies
         with (
             patch(
                 "custom_components.entity_availability.combined_sensor.resolve_area_name",
@@ -1972,7 +1975,7 @@ class TestCombinedAffectedAreasSensors:
                 mock_hass, combined_entry, coordinators
             )
             value = sensor.native_value
-        assert value == "None"
+        assert value == "(No Area)"
 
     def test_recently_recovered_suppressed_entity_skipped(
         self, mock_hass, combined_entry, coordinators
