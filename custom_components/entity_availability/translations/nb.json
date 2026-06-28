@@ -145,6 +145,18 @@
       },
       "availability_7d": {
         "name": "Tilgjengelighet (7 dager)"
+      },
+      "affected_areas_count": {
+        "name": "Antall Berørte Områder"
+      },
+      "affected_areas": {
+        "name": "Berørte Områder"
+      },
+      "affected_areas_recently_offline": {
+        "name": "Nylig Frakoblede Områder"
+      },
+      "affected_areas_recently_recovered": {
+        "name": "Nylig Gjenopprettede Områder"
       }
     },
     "binary_sensor": {

@@ -145,6 +145,18 @@
       },
       "availability_7d": {
         "name": "Verfügbarkeit (7 Tage)"
+      },
+      "affected_areas_count": {
+        "name": "Betroffene Bereiche Anzahl"
+      },
+      "affected_areas": {
+        "name": "Betroffene Bereiche"
+      },
+      "affected_areas_recently_offline": {
+        "name": "Zuletzt Offline Bereiche"
+      },
+      "affected_areas_recently_recovered": {
+        "name": "Zuletzt Wiederhergestellte Bereiche"
       }
     },
     "binary_sensor": {

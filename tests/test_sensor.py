@@ -24,6 +24,10 @@ from custom_components.entity_availability.coordinator import (
 )
 from custom_components.entity_availability.models import DeviceState
 from custom_components.entity_availability.sensor import (
+    AffectedAreasCountSensor,
+    AffectedAreasRecentlyOfflineSensor,
+    AffectedAreasRecentlyRecoveredSensor,
+    AffectedAreasSensor,
     AvailabilitySensor,
     DegradedDevicesSensor,
     GroupSummarySensor,
@@ -1686,3 +1690,603 @@ class TestRecentlyRecoveredSensorWithDeviceNames:
             value = sensor.native_value
 
         assert value == "Device A"
+
+
+# ---------------------------------------------------------------------------
+# AffectedAreas group sensors
+# ---------------------------------------------------------------------------
+
+
+class TestAffectedAreasSensors:
+    """Tests for the 4 affected-areas group sensors."""
+
+    # ------------------------------------------------------------------
+    # AffectedAreasCountSensor
+    # ------------------------------------------------------------------
+
+    def test_count_entity_with_area(self, mock_coordinator, mock_hass):
+        """Offline entity with area → count=1."""
+        with patch(
+            "custom_components.entity_availability.sensor.resolve_area_name",
+            return_value="Kitchen",
+        ):
+            sensor = AffectedAreasCountSensor(
+                mock_coordinator, "Test Group", "test_group", "test_entry_id"
+            )
+            sensor.hass = mock_hass
+            assert sensor.native_value == 1
+
+    def test_count_two_offline_same_area_deduped(self, mock_coordinator, mock_hass):
+        """Two offline entities in the same area → count=1 (dedup)."""
+        mock_coordinator._device_states["binary_sensor.device_a"].is_offline = True
+        with patch(
+            "custom_components.entity_availability.sensor.resolve_area_name",
+            return_value="Kitchen",
+        ):
+            sensor = AffectedAreasCountSensor(
+                mock_coordinator, "Test Group", "test_group", "test_entry_id"
+            )
+            sensor.hass = mock_hass
+            assert sensor.native_value == 1
+
+    def test_count_no_area_returns_zero(self, mock_coordinator, mock_hass):
+        """Offline entity with no area → count=0."""
+        with patch(
+            "custom_components.entity_availability.sensor.resolve_area_name",
+            return_value=None,
+        ):
+            sensor = AffectedAreasCountSensor(
+                mock_coordinator, "Test Group", "test_group", "test_entry_id"
+            )
+            sensor.hass = mock_hass
+            assert sensor.native_value == 0
+
+    def test_count_suppressed_excluded(self, mock_coordinator, mock_hass):
+        """Suppressed offline entity excluded → count=0."""
+        mock_coordinator._device_states["binary_sensor.device_b"].is_suppressed = True
+        with patch(
+            "custom_components.entity_availability.sensor.resolve_area_name",
+            return_value="Kitchen",
+        ):
+            sensor = AffectedAreasCountSensor(
+                mock_coordinator, "Test Group", "test_group", "test_entry_id"
+            )
+            sensor.hass = mock_hass
+            assert sensor.native_value == 0
+
+    def test_count_unique_id(self, mock_coordinator, mock_hass):
+        """unique_id follows expected format."""
+        sensor = AffectedAreasCountSensor(
+            mock_coordinator, "Test Group", "test_group", "test_entry_id"
+        )
+        assert sensor.unique_id == "test_entry_id_affected_areas_count"
+
+    # ------------------------------------------------------------------
+    # AffectedAreasSensor
+    # ------------------------------------------------------------------
+
+    def test_areas_state_single_area(self, mock_coordinator, mock_hass):
+        """Offline entity with area → state='Kitchen'."""
+        with patch(
+            "custom_components.entity_availability.sensor.resolve_area_name",
+            return_value="Kitchen",
+        ):
+            sensor = AffectedAreasSensor(
+                mock_coordinator, "Test Group", "test_group", "test_entry_id"
+            )
+            sensor.hass = mock_hass
+            assert sensor.native_value == "Kitchen"
+
+    def test_areas_state_none_when_no_offline(self, mock_coordinator, mock_hass):
+        """All online → state='None'."""
+        mock_coordinator._device_states["binary_sensor.device_b"].is_offline = False
+        with patch(
+            "custom_components.entity_availability.sensor.resolve_area_name",
+            return_value="Kitchen",
+        ):
+            sensor = AffectedAreasSensor(
+                mock_coordinator, "Test Group", "test_group", "test_entry_id"
+            )
+            sensor.hass = mock_hass
+            assert sensor.native_value == "None"
+
+    def test_areas_multiple_areas_sorted(self, mock_coordinator, mock_hass):
+        """Multiple offline entities in different areas → sorted output."""
+        mock_coordinator._device_states["binary_sensor.device_a"].is_offline = True
+        area_map = {
+            "binary_sensor.device_a": "Garage",
+            "binary_sensor.device_b": "Kitchen",
+            "binary_sensor.device_c": None,
+        }
+
+        def _area_side_effect(hass, entity_id):
+            return area_map.get(entity_id)
+
+        with patch(
+            "custom_components.entity_availability.sensor.resolve_area_name",
+            side_effect=_area_side_effect,
+        ):
+            sensor = AffectedAreasSensor(
+                mock_coordinator, "Test Group", "test_group", "test_entry_id"
+            )
+            sensor.hass = mock_hass
+            value = sensor.native_value
+        # Sorted: Garage, Kitchen
+        assert value == "Garage, Kitchen"
+
+    def test_areas_unassigned_entities_in_attrs(self, mock_coordinator, mock_hass):
+        """Offline entity with no area shows up in unassigned_entities attr."""
+        with patch(
+            "custom_components.entity_availability.sensor.resolve_area_name",
+            return_value=None,
+        ):
+            sensor = AffectedAreasSensor(
+                mock_coordinator, "Test Group", "test_group", "test_entry_id"
+            )
+            sensor.hass = mock_hass
+            sensor.native_value  # populate cache
+            attrs = sensor.extra_state_attributes
+        assert "binary_sensor.device_b" in attrs["unassigned_entities"]
+        assert attrs["count"] == 0
+
+    def test_areas_truncation_at_255(self, mock_coordinator, mock_hass):
+        """Long area list is truncated to MAX_STATE_LENGTH."""
+        for i in range(50):
+            eid = f"binary_sensor.device_x{i:03d}"
+            mock_coordinator._device_states[eid] = DeviceState(
+                entity_id=eid, is_offline=True
+            )
+
+        def _area_side_effect(hass, entity_id):
+            return f"Very Long Area Name Number {entity_id[-3:]}"
+
+        with patch(
+            "custom_components.entity_availability.sensor.resolve_area_name",
+            side_effect=_area_side_effect,
+        ):
+            sensor = AffectedAreasSensor(
+                mock_coordinator, "Test Group", "test_group", "test_entry_id"
+            )
+            sensor.hass = mock_hass
+            value = sensor.native_value
+        assert len(value) <= MAX_STATE_LENGTH
+        assert value.endswith("...")
+
+    # ------------------------------------------------------------------
+    # AffectedAreasRecentlyOfflineSensor
+    # ------------------------------------------------------------------
+
+    def test_recently_offline_entity_with_area_in_window(
+        self, mock_coordinator, mock_hass
+    ):
+        """Offline entity with recent offline_at within window → area shown."""
+        from datetime import timedelta
+
+        mock_coordinator._device_states[
+            "binary_sensor.device_b"
+        ].recently_offline_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+
+        with patch(
+            "custom_components.entity_availability.sensor.resolve_area_name",
+            return_value="Kitchen",
+        ):
+            sensor = AffectedAreasRecentlyOfflineSensor(
+                mock_coordinator, "Test Group", "test_group", "test_entry_id"
+            )
+            sensor.hass = mock_hass
+            assert sensor.native_value == "Kitchen"
+
+    def test_recently_offline_outside_window_excluded(
+        self, mock_coordinator, mock_hass
+    ):
+        """recently_offline_at outside window → excluded."""
+        from datetime import timedelta
+
+        mock_coordinator._device_states[
+            "binary_sensor.device_b"
+        ].recently_offline_at = datetime.now(timezone.utc) - timedelta(minutes=10)
+
+        with patch(
+            "custom_components.entity_availability.sensor.resolve_area_name",
+            return_value="Kitchen",
+        ):
+            sensor = AffectedAreasRecentlyOfflineSensor(
+                mock_coordinator, "Test Group", "test_group", "test_entry_id"
+            )
+            sensor.hass = mock_hass
+            assert sensor.native_value == "None"
+
+    def test_recently_offline_no_timestamp_excluded(self, mock_coordinator, mock_hass):
+        """Entity without recently_offline_at → excluded."""
+        with patch(
+            "custom_components.entity_availability.sensor.resolve_area_name",
+            return_value="Kitchen",
+        ):
+            sensor = AffectedAreasRecentlyOfflineSensor(
+                mock_coordinator, "Test Group", "test_group", "test_entry_id"
+            )
+            sensor.hass = mock_hass
+            assert sensor.native_value == "None"
+
+    def test_recently_offline_attrs_have_window(self, mock_coordinator, mock_hass):
+        """extra_state_attributes includes window_minutes."""
+        from datetime import timedelta
+
+        mock_coordinator._device_states[
+            "binary_sensor.device_b"
+        ].recently_offline_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+
+        with patch(
+            "custom_components.entity_availability.sensor.resolve_area_name",
+            return_value="Kitchen",
+        ):
+            sensor = AffectedAreasRecentlyOfflineSensor(
+                mock_coordinator, "Test Group", "test_group", "test_entry_id"
+            )
+            sensor.hass = mock_hass
+            sensor.native_value
+            attrs = sensor.extra_state_attributes
+        assert "window_minutes" in attrs
+        assert attrs["count"] == 1
+
+    # ------------------------------------------------------------------
+    # AffectedAreasRecentlyRecoveredSensor
+    # ------------------------------------------------------------------
+
+    def test_recently_recovered_all_online_with_recent_recovery(
+        self, mock_coordinator, mock_hass
+    ):
+        """All non-suppressed entities online + recent last_recovery → area shown."""
+        from datetime import timedelta
+
+        mock_coordinator._device_states["binary_sensor.device_a"].last_recovery = (
+            datetime.now(timezone.utc) - timedelta(minutes=2)
+        )
+
+        with patch(
+            "custom_components.entity_availability.sensor.resolve_area_name",
+            return_value="Kitchen",
+        ):
+            sensor = AffectedAreasRecentlyRecoveredSensor(
+                mock_coordinator, "Test Group", "test_group", "test_entry_id"
+            )
+            sensor.hass = mock_hass
+            # device_b is still offline → Kitchen NOT fully recovered
+            assert sensor.native_value == "None"
+
+    def test_recently_recovered_one_entity_still_offline_area_absent(
+        self, mock_coordinator, mock_hass
+    ):
+        """If one entity in area is still offline, area is absent."""
+        from datetime import timedelta
+
+        mock_coordinator._device_states["binary_sensor.device_a"].last_recovery = (
+            datetime.now(timezone.utc) - timedelta(minutes=2)
+        )
+        # device_b is already offline by default — so Kitchen is not fully recovered
+
+        with patch(
+            "custom_components.entity_availability.sensor.resolve_area_name",
+            return_value="Kitchen",
+        ):
+            sensor = AffectedAreasRecentlyRecoveredSensor(
+                mock_coordinator, "Test Group", "test_group", "test_entry_id"
+            )
+            sensor.hass = mock_hass
+            assert sensor.native_value == "None"
+
+    def test_recently_recovered_recovery_outside_window_absent(
+        self, mock_coordinator, mock_hass
+    ):
+        """Recovery outside window → area absent."""
+        from datetime import timedelta
+
+        # Make all online
+        mock_coordinator._device_states["binary_sensor.device_b"].is_offline = False
+        mock_coordinator._device_states["binary_sensor.device_a"].last_recovery = (
+            datetime.now(timezone.utc) - timedelta(minutes=10)
+        )
+
+        with patch(
+            "custom_components.entity_availability.sensor.resolve_area_name",
+            return_value="Kitchen",
+        ):
+            sensor = AffectedAreasRecentlyRecoveredSensor(
+                mock_coordinator, "Test Group", "test_group", "test_entry_id"
+            )
+            sensor.hass = mock_hass
+            assert sensor.native_value == "None"
+
+    def test_recently_recovered_suppressed_entity_not_blocking(
+        self, mock_coordinator, mock_hass
+    ):
+        """Suppressed entity not counted in 'all offline' check → area can still qualify."""
+        from datetime import timedelta
+
+        # device_b is offline but suppressed — should not block recovery
+        mock_coordinator._device_states["binary_sensor.device_b"].is_suppressed = True
+        mock_coordinator._device_states["binary_sensor.device_a"].last_recovery = (
+            datetime.now(timezone.utc) - timedelta(minutes=2)
+        )
+        # device_c is online with no recovery
+        area_map = {
+            "binary_sensor.device_a": "Kitchen",
+            "binary_sensor.device_b": "Kitchen",  # suppressed → ignored
+            "binary_sensor.device_c": "Kitchen",
+        }
+
+        def _area_side_effect(hass, entity_id):
+            return area_map.get(entity_id)
+
+        with patch(
+            "custom_components.entity_availability.sensor.resolve_area_name",
+            side_effect=_area_side_effect,
+        ):
+            sensor = AffectedAreasRecentlyRecoveredSensor(
+                mock_coordinator, "Test Group", "test_group", "test_entry_id"
+            )
+            sensor.hass = mock_hass
+            # device_a and device_c both online, device_a has recent recovery → Kitchen qualifies
+            assert sensor.native_value == "Kitchen"
+
+    def test_recently_recovered_attrs_have_window(self, mock_coordinator, mock_hass):
+        """extra_state_attributes includes window_minutes."""
+        from datetime import timedelta
+
+        mock_coordinator._device_states["binary_sensor.device_b"].is_offline = False
+        mock_coordinator._device_states["binary_sensor.device_b"].last_recovery = (
+            datetime.now(timezone.utc) - timedelta(minutes=1)
+        )
+
+        with patch(
+            "custom_components.entity_availability.sensor.resolve_area_name",
+            return_value="Kitchen",
+        ):
+            sensor = AffectedAreasRecentlyRecoveredSensor(
+                mock_coordinator, "Test Group", "test_group", "test_entry_id"
+            )
+            sensor.hass = mock_hass
+            sensor.native_value
+            attrs = sensor.extra_state_attributes
+        assert "window_minutes" in attrs
+
+    def test_recently_offline_truncation(self, mock_coordinator, mock_hass):
+        """Long area list in AffectedAreasRecentlyOfflineSensor is truncated."""
+        from datetime import timedelta
+
+        # Add 50 offline entities with recently_offline_at within window
+        now = datetime.now(timezone.utc) - timedelta(minutes=1)
+        for i in range(50):
+            eid = f"binary_sensor.offline_{i:03d}"
+            mock_coordinator._device_states[eid] = DeviceState(
+                entity_id=eid,
+                is_offline=True,
+                recently_offline_at=now,
+            )
+
+        def _area_side_effect(hass, entity_id):
+            return f"Very Long Area Name For Entity {entity_id[-3:]}"
+
+        with patch(
+            "custom_components.entity_availability.sensor.resolve_area_name",
+            side_effect=_area_side_effect,
+        ):
+            sensor = AffectedAreasRecentlyOfflineSensor(
+                mock_coordinator, "Test Group", "test_group", "test_entry_id"
+            )
+            sensor.hass = mock_hass
+            value = sensor.native_value
+        assert len(value) <= MAX_STATE_LENGTH
+        assert value.endswith("...")
+
+    def test_recently_recovered_no_area_skipped(self, mock_coordinator, mock_hass):
+        """Entity with no area is skipped in AffectedAreasRecentlyRecoveredSensor (line 799 branch)."""
+        from datetime import timedelta
+
+        mock_coordinator._device_states["binary_sensor.device_b"].is_offline = False
+        mock_coordinator._device_states["binary_sensor.device_b"].last_recovery = (
+            datetime.now(timezone.utc) - timedelta(minutes=1)
+        )
+        # Entities with no area → not added to area_devices → no areas qualify
+        with patch(
+            "custom_components.entity_availability.sensor.resolve_area_name",
+            return_value=None,
+        ):
+            sensor = AffectedAreasRecentlyRecoveredSensor(
+                mock_coordinator, "Test Group", "test_group", "test_entry_id"
+            )
+            sensor.hass = mock_hass
+            assert sensor.native_value == "None"
+
+    def test_recently_recovered_truncation(self, mock_coordinator, mock_hass):
+        """Long area list in AffectedAreasRecentlyRecoveredSensor is truncated."""
+        from datetime import timedelta
+
+        # All devices online, all with recent recovery, all in unique areas
+        for d in mock_coordinator._device_states.values():
+            d.is_offline = False
+            d.last_recovery = datetime.now(timezone.utc) - timedelta(minutes=1)
+        # Add more devices in unique areas
+        for i in range(50):
+            eid = f"binary_sensor.rec_{i:03d}"
+            mock_coordinator._device_states[eid] = DeviceState(
+                entity_id=eid,
+                is_offline=False,
+                last_recovery=datetime.now(timezone.utc) - timedelta(minutes=1),
+            )
+
+        def _area_side_effect(hass, entity_id):
+            return f"Very Long Area Name For Entity {entity_id[-3:]}"
+
+        with patch(
+            "custom_components.entity_availability.sensor.resolve_area_name",
+            side_effect=_area_side_effect,
+        ):
+            sensor = AffectedAreasRecentlyRecoveredSensor(
+                mock_coordinator, "Test Group", "test_group", "test_entry_id"
+            )
+            sensor.hass = mock_hass
+            value = sensor.native_value
+        assert len(value) <= MAX_STATE_LENGTH
+        assert value.endswith("...")
+
+
+# ---------------------------------------------------------------------------
+# resolve_area_name helper — branch coverage
+# ---------------------------------------------------------------------------
+
+
+class TestResolveAreaName:
+    """Unit tests for resolve_area_name helper in helpers.py."""
+
+    def test_returns_none_when_entity_not_in_registry(self, mock_hass):
+        """Entity not in registry → None."""
+        from custom_components.entity_availability.helpers import resolve_area_name
+
+        mock_er = MagicMock()
+        mock_er.async_get.return_value = None
+        with patch(
+            "custom_components.entity_availability.helpers.er.async_get",
+            return_value=mock_er,
+        ):
+            result = resolve_area_name(mock_hass, "binary_sensor.device_a")
+        assert result is None
+
+    def test_returns_area_from_entity_area_id(self, mock_hass):
+        """Entity has area_id → returns area.name."""
+        from custom_components.entity_availability.helpers import resolve_area_name
+
+        mock_entry = MagicMock()
+        mock_entry.area_id = "area_abc"
+        mock_entry.device_id = None
+
+        mock_er = MagicMock()
+        mock_er.async_get.return_value = mock_entry
+
+        mock_area = MagicMock()
+        mock_area.name = "Kitchen"
+        mock_ar = MagicMock()
+        mock_ar.async_get_area.return_value = mock_area
+
+        with (
+            patch(
+                "custom_components.entity_availability.helpers.er.async_get",
+                return_value=mock_er,
+            ),
+            patch(
+                "custom_components.entity_availability.helpers.ar.async_get",
+                return_value=mock_ar,
+            ),
+        ):
+            result = resolve_area_name(mock_hass, "binary_sensor.device_a")
+        assert result == "Kitchen"
+
+    def test_falls_back_to_device_area_id(self, mock_hass):
+        """Entity has no area_id → falls back to device.area_id."""
+        from custom_components.entity_availability.helpers import resolve_area_name
+
+        mock_entry = MagicMock()
+        mock_entry.area_id = None
+        mock_entry.device_id = "device_xyz"
+
+        mock_device = MagicMock()
+        mock_device.area_id = "area_garage"
+
+        mock_er = MagicMock()
+        mock_er.async_get.return_value = mock_entry
+        mock_dr = MagicMock()
+        mock_dr.async_get.return_value = mock_device
+
+        mock_area = MagicMock()
+        mock_area.name = "Garage"
+        mock_ar = MagicMock()
+        mock_ar.async_get_area.return_value = mock_area
+
+        with (
+            patch(
+                "custom_components.entity_availability.helpers.er.async_get",
+                return_value=mock_er,
+            ),
+            patch(
+                "custom_components.entity_availability.helpers.dr.async_get",
+                return_value=mock_dr,
+            ),
+            patch(
+                "custom_components.entity_availability.helpers.ar.async_get",
+                return_value=mock_ar,
+            ),
+        ):
+            result = resolve_area_name(mock_hass, "binary_sensor.device_a")
+        assert result == "Garage"
+
+    def test_returns_none_when_no_area_id(self, mock_hass):
+        """Entity and device both have no area_id → None."""
+        from custom_components.entity_availability.helpers import resolve_area_name
+
+        mock_entry = MagicMock()
+        mock_entry.area_id = None
+        mock_entry.device_id = None
+
+        mock_er = MagicMock()
+        mock_er.async_get.return_value = mock_entry
+
+        with patch(
+            "custom_components.entity_availability.helpers.er.async_get",
+            return_value=mock_er,
+        ):
+            result = resolve_area_name(mock_hass, "binary_sensor.device_a")
+        assert result is None
+
+    def test_returns_none_when_area_not_found(self, mock_hass):
+        """area_id set but area not found in registry → None."""
+        from custom_components.entity_availability.helpers import resolve_area_name
+
+        mock_entry = MagicMock()
+        mock_entry.area_id = "area_missing"
+        mock_entry.device_id = None
+
+        mock_er = MagicMock()
+        mock_er.async_get.return_value = mock_entry
+
+        mock_ar = MagicMock()
+        mock_ar.async_get_area.return_value = None
+
+        with (
+            patch(
+                "custom_components.entity_availability.helpers.er.async_get",
+                return_value=mock_er,
+            ),
+            patch(
+                "custom_components.entity_availability.helpers.ar.async_get",
+                return_value=mock_ar,
+            ),
+        ):
+            result = resolve_area_name(mock_hass, "binary_sensor.device_a")
+        assert result is None
+
+    def test_returns_none_when_device_not_found(self, mock_hass):
+        """Entity has device_id but device not in registry → None."""
+        from custom_components.entity_availability.helpers import resolve_area_name
+
+        mock_entry = MagicMock()
+        mock_entry.area_id = None
+        mock_entry.device_id = "device_missing"
+
+        mock_er = MagicMock()
+        mock_er.async_get.return_value = mock_entry
+
+        mock_dr = MagicMock()
+        mock_dr.async_get.return_value = None
+
+        with (
+            patch(
+                "custom_components.entity_availability.helpers.er.async_get",
+                return_value=mock_er,
+            ),
+            patch(
+                "custom_components.entity_availability.helpers.dr.async_get",
+                return_value=mock_dr,
+            ),
+        ):
+            result = resolve_area_name(mock_hass, "binary_sensor.device_a")
+        assert result is None

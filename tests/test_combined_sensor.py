@@ -14,6 +14,10 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.entity_availability.combined_sensor import (
     MAX_STATE_LENGTH,
+    CombinedAffectedAreasCountSensor,
+    CombinedAffectedAreasRecentlyOfflineSensor,
+    CombinedAffectedAreasRecentlyRecoveredSensor,
+    CombinedAffectedAreasSensor,
     CombinedGroupSensor,
     CombinedLowBatteryCountSensor,
     CombinedLowBatterySensor,
@@ -844,7 +848,7 @@ class TestAsyncSetupEntry:
             added.extend(entities)
 
         await async_setup_entry(mock_hass, combined_entry, _fake_add)
-        assert len(added) == 7
+        assert len(added) == 11
         types = {type(s) for s in added}
         assert CombinedOfflineCountSensor in types
         assert CombinedRecentlyOfflineSensor in types
@@ -1593,3 +1597,448 @@ class TestFriendlyNameBranches:
             value = sensor.native_value
 
         assert "Friendly A2" in value
+
+
+# ---------------------------------------------------------------------------
+# CombinedAffectedAreas sensors
+# ---------------------------------------------------------------------------
+
+
+class TestCombinedAffectedAreasSensors:
+    """Tests for the 4 combined affected-areas sensors."""
+
+    def _count_sensor(self, hass, entry, coordinators):
+        return CombinedAffectedAreasCountSensor(
+            hass,
+            entry,
+            "Combined",
+            "combined",
+            coordinators,
+            [c.entry.entry_id for c in coordinators],
+        )
+
+    def _areas_sensor(self, hass, entry, coordinators):
+        return CombinedAffectedAreasSensor(
+            hass,
+            entry,
+            "Combined",
+            "combined",
+            coordinators,
+            [c.entry.entry_id for c in coordinators],
+        )
+
+    def _recently_offline_sensor(self, hass, entry, coordinators):
+        return CombinedAffectedAreasRecentlyOfflineSensor(
+            hass,
+            entry,
+            "Combined",
+            "combined",
+            coordinators,
+            [c.entry.entry_id for c in coordinators],
+        )
+
+    def _recently_recovered_sensor(self, hass, entry, coordinators):
+        return CombinedAffectedAreasRecentlyRecoveredSensor(
+            hass,
+            entry,
+            "Combined",
+            "combined",
+            coordinators,
+            [c.entry.entry_id for c in coordinators],
+        )
+
+    # ------------------------------------------------------------------
+    # CombinedAffectedAreasCountSensor
+    # ------------------------------------------------------------------
+
+    def test_count_same_area_deduped(self, mock_hass, combined_entry, coordinators):
+        """Two coordinators, both have offline entities in the same area → count=1."""
+        mock_hass.data[DOMAIN] = {
+            "entry_a": coordinators[0],
+            "entry_b": coordinators[1],
+        }
+        coordinators[1]._device_states["binary_sensor.b1"].is_offline = True
+        with patch(
+            "custom_components.entity_availability.combined_sensor.resolve_area_name",
+            return_value="Kitchen",
+        ):
+            sensor = self._count_sensor(mock_hass, combined_entry, coordinators)
+            assert sensor.native_value == 1
+
+    def test_count_different_areas(self, mock_hass, combined_entry, coordinators):
+        """Two coordinators, offline entities in different areas → count=2."""
+        mock_hass.data[DOMAIN] = {
+            "entry_a": coordinators[0],
+            "entry_b": coordinators[1],
+        }
+        coordinators[1]._device_states["binary_sensor.b1"].is_offline = True
+
+        area_map = {
+            "binary_sensor.a2": "Kitchen",
+            "binary_sensor.b1": "Garage",
+        }
+
+        def _area_side_effect(hass, entity_id):
+            return area_map.get(entity_id)
+
+        with patch(
+            "custom_components.entity_availability.combined_sensor.resolve_area_name",
+            side_effect=_area_side_effect,
+        ):
+            sensor = self._count_sensor(mock_hass, combined_entry, coordinators)
+            assert sensor.native_value == 2
+
+    def test_count_no_active_coordinators(
+        self, mock_hass, combined_entry, coordinators
+    ):
+        """No active coordinators → count=0."""
+        mock_hass.data[DOMAIN] = {}
+        with patch(
+            "custom_components.entity_availability.combined_sensor.resolve_area_name",
+            return_value="Kitchen",
+        ):
+            sensor = self._count_sensor(mock_hass, combined_entry, coordinators)
+            assert sensor.native_value == 0
+
+    # ------------------------------------------------------------------
+    # CombinedAffectedAreasSensor
+    # ------------------------------------------------------------------
+
+    def test_areas_none_when_no_offline(self, mock_hass, combined_entry, coordinators):
+        """All online → 'None'."""
+        mock_hass.data[DOMAIN] = {
+            "entry_a": coordinators[0],
+            "entry_b": coordinators[1],
+        }
+        coordinators[0]._device_states["binary_sensor.a2"].is_offline = False
+        with patch(
+            "custom_components.entity_availability.combined_sensor.resolve_area_name",
+            return_value="Kitchen",
+        ):
+            sensor = self._areas_sensor(mock_hass, combined_entry, coordinators)
+            assert sensor.native_value == "None"
+
+    def test_areas_union_sorted(self, mock_hass, combined_entry, coordinators):
+        """Union of areas from both coords, sorted."""
+        mock_hass.data[DOMAIN] = {
+            "entry_a": coordinators[0],
+            "entry_b": coordinators[1],
+        }
+        coordinators[1]._device_states["binary_sensor.b1"].is_offline = True
+
+        area_map = {
+            "binary_sensor.a2": "Kitchen",
+            "binary_sensor.b1": "Garage",
+        }
+
+        def _area_side_effect(hass, entity_id):
+            return area_map.get(entity_id)
+
+        with patch(
+            "custom_components.entity_availability.combined_sensor.resolve_area_name",
+            side_effect=_area_side_effect,
+        ):
+            sensor = self._areas_sensor(mock_hass, combined_entry, coordinators)
+            assert sensor.native_value == "Garage, Kitchen"
+
+    # ------------------------------------------------------------------
+    # CombinedAffectedAreasRecentlyOfflineSensor
+    # ------------------------------------------------------------------
+
+    def test_recently_offline_per_coordinator_window(
+        self, mock_hass, combined_entry, coordinators
+    ):
+        """Per-coordinator window respected — one inside, one outside."""
+        from custom_components.entity_availability.const import CONF_RECOVERY_WINDOW
+        from datetime import timedelta
+
+        mock_hass.data[DOMAIN] = {
+            "entry_a": coordinators[0],
+            "entry_b": coordinators[1],
+        }
+        # coord_a has 5-min window, coord_b has 1-min window
+        coordinators[0].entry = MockConfigEntry(
+            version=1,
+            domain=DOMAIN,
+            title="Group A",
+            data={**coordinators[0].entry.data, CONF_RECOVERY_WINDOW: 5},
+            entry_id="entry_a",
+        )
+        coordinators[1].entry = MockConfigEntry(
+            version=1,
+            domain=DOMAIN,
+            title="Group B",
+            data={**coordinators[1].entry.data, CONF_RECOVERY_WINDOW: 1},
+            entry_id="entry_b",
+        )
+        # a2 went offline 3 min ago (within coord_a 5-min window)
+        coordinators[0]._device_states["binary_sensor.a2"].recently_offline_at = (
+            _NOW - timedelta(minutes=3)
+        )
+        # b1 went offline 3 min ago (outside coord_b 1-min window)
+        coordinators[1]._device_states["binary_sensor.b1"].is_offline = True
+        coordinators[1]._device_states["binary_sensor.b1"].recently_offline_at = (
+            _NOW - timedelta(minutes=3)
+        )
+
+        area_map = {
+            "binary_sensor.a2": "Kitchen",
+            "binary_sensor.b1": "Garage",
+        }
+
+        def _area_side_effect(hass, entity_id):
+            return area_map.get(entity_id)
+
+        with (
+            patch(
+                "custom_components.entity_availability.combined_sensor.resolve_area_name",
+                side_effect=_area_side_effect,
+            ),
+            patch(
+                "custom_components.entity_availability.combined_sensor.datetime"
+            ) as mock_dt,
+        ):
+            mock_dt.now.return_value = _NOW
+            sensor = self._recently_offline_sensor(
+                mock_hass, combined_entry, coordinators
+            )
+            value = sensor.native_value
+        # Kitchen (a2) in window; Garage (b1) outside window
+        assert value == "Kitchen"
+
+    # ------------------------------------------------------------------
+    # CombinedAffectedAreasRecentlyRecoveredSensor
+    # ------------------------------------------------------------------
+
+    def test_recently_recovered_one_offline_area_absent(
+        self, mock_hass, combined_entry, coordinators
+    ):
+        """Entity still offline in coord B → area absent."""
+        from datetime import timedelta
+
+        mock_hass.data[DOMAIN] = {
+            "entry_a": coordinators[0],
+            "entry_b": coordinators[1],
+        }
+        # b1 is online, but a2 in same area is offline
+        coordinators[0]._device_states["binary_sensor.a2"].last_recovery = (
+            _NOW - timedelta(minutes=1)
+        )
+
+        with (
+            patch(
+                "custom_components.entity_availability.combined_sensor.resolve_area_name",
+                return_value="Kitchen",
+            ),
+            patch(
+                "custom_components.entity_availability.combined_sensor.datetime"
+            ) as mock_dt,
+        ):
+            mock_dt.now.return_value = _NOW
+            sensor = self._recently_recovered_sensor(
+                mock_hass, combined_entry, coordinators
+            )
+            # a2 is offline → Kitchen not fully recovered
+            value = sensor.native_value
+        assert value == "None"
+
+    def test_recently_recovered_all_online_with_recent_recovery(
+        self, mock_hass, combined_entry, coordinators
+    ):
+        """All online across both coords + recent recovery → area present."""
+        from datetime import timedelta
+
+        mock_hass.data[DOMAIN] = {
+            "entry_a": coordinators[0],
+            "entry_b": coordinators[1],
+        }
+        # Make a2 online too
+        coordinators[0]._device_states["binary_sensor.a2"].is_offline = False
+        coordinators[0]._device_states["binary_sensor.a2"].last_recovery = (
+            _NOW - timedelta(minutes=1)
+        )
+
+        with (
+            patch(
+                "custom_components.entity_availability.combined_sensor.resolve_area_name",
+                return_value="Kitchen",
+            ),
+            patch(
+                "custom_components.entity_availability.combined_sensor.datetime"
+            ) as mock_dt,
+        ):
+            mock_dt.now.return_value = _NOW
+            sensor = self._recently_recovered_sensor(
+                mock_hass, combined_entry, coordinators
+            )
+            value = sensor.native_value
+        assert value == "Kitchen"
+
+    def test_areas_unassigned_entities_in_attrs(
+        self, mock_hass, combined_entry, coordinators
+    ):
+        """Offline entity with no area shows up in unassigned_entities attr."""
+        mock_hass.data[DOMAIN] = {
+            "entry_a": coordinators[0],
+            "entry_b": coordinators[1],
+        }
+        with patch(
+            "custom_components.entity_availability.combined_sensor.resolve_area_name",
+            return_value=None,
+        ):
+            sensor = self._areas_sensor(mock_hass, combined_entry, coordinators)
+            sensor.native_value  # populate cache
+            attrs = sensor.extra_state_attributes
+        assert "binary_sensor.a2" in attrs["unassigned_entities"]
+        assert attrs["count"] == 0
+
+    def test_recently_offline_none_when_no_match(
+        self, mock_hass, combined_entry, coordinators
+    ):
+        """No entities with recently_offline_at → 'None' and empty attrs."""
+        mock_hass.data[DOMAIN] = {
+            "entry_a": coordinators[0],
+            "entry_b": coordinators[1],
+        }
+        with (
+            patch(
+                "custom_components.entity_availability.combined_sensor.resolve_area_name",
+                return_value="Kitchen",
+            ),
+            patch(
+                "custom_components.entity_availability.combined_sensor.datetime"
+            ) as mock_dt,
+        ):
+            mock_dt.now.return_value = _NOW
+            sensor = self._recently_offline_sensor(
+                mock_hass, combined_entry, coordinators
+            )
+            value = sensor.native_value
+            attrs = sensor.extra_state_attributes
+        assert value == "None"
+        assert attrs["count"] == 0
+
+    def test_recently_offline_extra_attrs(
+        self, mock_hass, combined_entry, coordinators
+    ):
+        """extra_state_attributes returns areas and count for recently offline."""
+        mock_hass.data[DOMAIN] = {
+            "entry_a": coordinators[0],
+            "entry_b": coordinators[1],
+        }
+        coordinators[0]._device_states["binary_sensor.a2"].recently_offline_at = (
+            _NOW - timedelta(minutes=1)
+        )
+        with (
+            patch(
+                "custom_components.entity_availability.combined_sensor.resolve_area_name",
+                return_value="Kitchen",
+            ),
+            patch(
+                "custom_components.entity_availability.combined_sensor.datetime"
+            ) as mock_dt,
+        ):
+            mock_dt.now.return_value = _NOW
+            sensor = self._recently_offline_sensor(
+                mock_hass, combined_entry, coordinators
+            )
+            attrs = sensor.extra_state_attributes
+        assert attrs["count"] == 1
+        assert "Kitchen" in attrs["areas"]
+
+    def test_recently_recovered_no_area_entities_skipped(
+        self, mock_hass, combined_entry, coordinators
+    ):
+        """Entities with no area are skipped in CombinedAffectedAreasRecentlyRecoveredSensor."""
+        mock_hass.data[DOMAIN] = {
+            "entry_a": coordinators[0],
+            "entry_b": coordinators[1],
+        }
+        coordinators[0]._device_states["binary_sensor.a2"].is_offline = False
+        coordinators[0]._device_states["binary_sensor.a2"].last_recovery = (
+            _NOW - timedelta(minutes=1)
+        )
+        with (
+            patch(
+                "custom_components.entity_availability.combined_sensor.resolve_area_name",
+                return_value=None,
+            ),
+            patch(
+                "custom_components.entity_availability.combined_sensor.datetime"
+            ) as mock_dt,
+        ):
+            mock_dt.now.return_value = _NOW
+            sensor = self._recently_recovered_sensor(
+                mock_hass, combined_entry, coordinators
+            )
+            value = sensor.native_value
+        assert value == "None"
+
+    def test_recently_recovered_suppressed_entity_skipped(
+        self, mock_hass, combined_entry, coordinators
+    ):
+        """Suppressed entities are not included in area_pairs for recently recovered."""
+        mock_hass.data[DOMAIN] = {
+            "entry_a": coordinators[0],
+            "entry_b": coordinators[1],
+        }
+        # Suppress a2 (offline) — should not block area recovery for other entities
+        coordinators[0]._device_states["binary_sensor.a2"].is_suppressed = True
+        # a1 is online with recent recovery
+        coordinators[0]._device_states["binary_sensor.a1"].last_recovery = (
+            _NOW - timedelta(minutes=1)
+        )
+
+        area_map = {
+            "binary_sensor.a1": "Kitchen",
+            "binary_sensor.a2": "Kitchen",  # suppressed → not included
+            "binary_sensor.b1": None,
+        }
+
+        def _area_side_effect(hass, entity_id):
+            return area_map.get(entity_id)
+
+        with (
+            patch(
+                "custom_components.entity_availability.combined_sensor.resolve_area_name",
+                side_effect=_area_side_effect,
+            ),
+            patch(
+                "custom_components.entity_availability.combined_sensor.datetime"
+            ) as mock_dt,
+        ):
+            mock_dt.now.return_value = _NOW
+            sensor = self._recently_recovered_sensor(
+                mock_hass, combined_entry, coordinators
+            )
+            value = sensor.native_value
+        assert value == "Kitchen"
+
+    def test_recently_recovered_extra_attrs(
+        self, mock_hass, combined_entry, coordinators
+    ):
+        """extra_state_attributes returns areas and count for recently recovered."""
+        mock_hass.data[DOMAIN] = {
+            "entry_a": coordinators[0],
+            "entry_b": coordinators[1],
+        }
+        coordinators[0]._device_states["binary_sensor.a2"].is_offline = False
+        coordinators[0]._device_states["binary_sensor.a2"].last_recovery = (
+            _NOW - timedelta(minutes=1)
+        )
+        with (
+            patch(
+                "custom_components.entity_availability.combined_sensor.resolve_area_name",
+                return_value="Kitchen",
+            ),
+            patch(
+                "custom_components.entity_availability.combined_sensor.datetime"
+            ) as mock_dt,
+        ):
+            mock_dt.now.return_value = _NOW
+            sensor = self._recently_recovered_sensor(
+                mock_hass, combined_entry, coordinators
+            )
+            attrs = sensor.extra_state_attributes
+        assert attrs["count"] == 1
+        assert "Kitchen" in attrs["areas"]
