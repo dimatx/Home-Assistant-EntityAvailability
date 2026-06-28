@@ -11,6 +11,7 @@ from typing import Any
 from homeassistant.components.sensor import SensorEntity, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -18,6 +19,7 @@ from .const import (
     CONF_BATTERY_ENTITY_MAP,
     CONF_COMBINED_GROUPS,
     CONF_GROUP_NAME,
+    CONF_USE_DEVICE_NAMES,
     DOMAIN,
 )
 from .coordinator import EntityAvailabilityCoordinator
@@ -77,7 +79,19 @@ def _device_info(entry_id: str, group_name: str) -> DeviceInfo:
     )
 
 
-def _friendly_name(hass: HomeAssistant, entity_id: str) -> str:
+def _friendly_name(
+    hass: HomeAssistant, entity_id: str, use_device_names: bool = False
+) -> str:
+    # ponytail: duplicate of _resolve_display_name in sensor.py — module-level
+    # circular import prevents sharing (sensor.py imports combined_sensor.py).
+    if use_device_names:
+        ent_reg = er.async_get(hass)
+        entry = ent_reg.async_get(entity_id)
+        if entry and entry.device_id:
+            dev_reg = dr.async_get(hass)
+            device = dev_reg.async_get(entry.device_id)
+            if device and (device.name_by_user or device.name):
+                return device.name_by_user or device.name
     state = hass.states.get(entity_id)
     if state and state.attributes.get("friendly_name"):
         return state.attributes["friendly_name"]
@@ -306,9 +320,14 @@ class CombinedOfflineEntitiesSensor(CombinedSensorBase):
 
     @property
     def native_value(self) -> str:
+        coords = self._active_coordinators()
         offline = [
-            _friendly_name(self.hass, d.entity_id)
-            for coord in self._active_coordinators()
+            _friendly_name(
+                self.hass,
+                d.entity_id,
+                coord.entry.data.get(CONF_USE_DEVICE_NAMES, False),
+            )
+            for coord in coords
             for d in coord.device_states.values()
             if d.is_offline and not d.is_suppressed
         ]
@@ -351,9 +370,10 @@ class CombinedLowBatterySensor(CombinedSensorBase):
 
     @property
     def native_value(self) -> str:
+        coords = self._active_coordinators()
         low = [
-            f"{_friendly_name(self.hass, d.entity_id)} ({d.battery_level}%)"
-            for coord in self._active_coordinators()
+            f"{_friendly_name(self.hass, d.entity_id, coord.entry.data.get(CONF_USE_DEVICE_NAMES, False))} ({d.battery_level}%)"
+            for coord in coords
             for d in coord.device_states.values()
             if d.is_degraded and not d.is_suppressed and d.battery_level is not None
         ]
@@ -429,7 +449,7 @@ class CombinedRecentlyOfflineSensor(CombinedSensorBase):
         for coord in self._active_coordinators():
             cutoff = coord.recovery_window_minutes * 60
             result += [
-                d
+                (coord, d)
                 for d in coord.device_states.values()
                 if d.is_offline
                 and not d.is_suppressed
@@ -440,10 +460,17 @@ class CombinedRecentlyOfflineSensor(CombinedSensorBase):
 
     @property
     def native_value(self) -> str:
-        devices = self._matching_devices()
-        if not devices:
+        pairs = self._matching_devices()
+        if not pairs:
             return "None"
-        result = ", ".join(_friendly_name(self.hass, d.entity_id) for d in devices)
+        result = ", ".join(
+            _friendly_name(
+                self.hass,
+                d.entity_id,
+                coord.entry.data.get(CONF_USE_DEVICE_NAMES, False),
+            )
+            for coord, d in pairs
+        )
         return (
             result[: MAX_STATE_LENGTH - 3] + "..."
             if len(result) > MAX_STATE_LENGTH - 3
@@ -452,8 +479,8 @@ class CombinedRecentlyOfflineSensor(CombinedSensorBase):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        devices = self._matching_devices()
-        return {"entities": [d.entity_id for d in devices], "count": len(devices)}
+        pairs = self._matching_devices()
+        return {"entities": [d.entity_id for _, d in pairs], "count": len(pairs)}
 
 
 class CombinedRecentlyRecoveredSensor(CombinedSensorBase):
@@ -480,7 +507,7 @@ class CombinedRecentlyRecoveredSensor(CombinedSensorBase):
         for coord in self._active_coordinators():
             cutoff = coord.recovery_window_minutes * 60
             result += [
-                d
+                (coord, d)
                 for d in coord.device_states.values()
                 if not d.is_offline
                 and not d.is_suppressed
@@ -491,10 +518,17 @@ class CombinedRecentlyRecoveredSensor(CombinedSensorBase):
 
     @property
     def native_value(self) -> str:
-        devices = self._matching_devices()
-        if not devices:
+        pairs = self._matching_devices()
+        if not pairs:
             return "None"
-        result = ", ".join(_friendly_name(self.hass, d.entity_id) for d in devices)
+        result = ", ".join(
+            _friendly_name(
+                self.hass,
+                d.entity_id,
+                coord.entry.data.get(CONF_USE_DEVICE_NAMES, False),
+            )
+            for coord, d in pairs
+        )
         return (
             result[: MAX_STATE_LENGTH - 3] + "..."
             if len(result) > MAX_STATE_LENGTH - 3
@@ -503,5 +537,5 @@ class CombinedRecentlyRecoveredSensor(CombinedSensorBase):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        devices = self._matching_devices()
-        return {"entities": [d.entity_id for d in devices], "count": len(devices)}
+        pairs = self._matching_devices()
+        return {"entities": [d.entity_id for _, d in pairs], "count": len(pairs)}
