@@ -17,6 +17,7 @@ from custom_components.entity_availability.combined_sensor import (
     CombinedGroupSensor,
     CombinedLowBatteryCountSensor,
     CombinedLowBatterySensor,
+    CombinedOfflineCountSensor,
     CombinedOfflineEntitiesSensor,
     CombinedRecentlyOfflineSensor,
     CombinedRecentlyRecoveredSensor,
@@ -290,39 +291,38 @@ class TestCombinedGroupSensor:
             [c.entry.entry_id for c in coordinators],
         )
 
-    def test_native_value_sums_offline(self, mock_hass, combined_entry, coordinators):
-        """native_value is the total count of unsuppressed offline devices across groups."""
+    def test_native_value_total_entities(self, mock_hass, combined_entry, coordinators):
+        """native_value is the total entity count across groups (2 + 1 = 3)."""
         mock_hass.data[DOMAIN] = {
             "entry_a": coordinators[0],
             "entry_b": coordinators[1],
         }
-        # a2 is offline, all others online
         sensor = self._sensor(mock_hass, combined_entry, coordinators)
-        assert sensor.native_value == 1
+        assert sensor.native_value == 3
 
-    def test_native_value_suppressed_excluded(
+    def test_native_value_suppressed_not_excluded(
         self, mock_hass, combined_entry, coordinators
     ):
-        """Suppressed offline devices are not counted."""
+        """Suppressed devices do not affect total entity count."""
         mock_hass.data[DOMAIN] = {
             "entry_a": coordinators[0],
             "entry_b": coordinators[1],
         }
         coordinators[0]._device_states["binary_sensor.a2"].is_suppressed = True
         sensor = self._sensor(mock_hass, combined_entry, coordinators)
-        assert sensor.native_value == 0
+        assert sensor.native_value == 3
 
     def test_native_value_multiple_groups(
         self, mock_hass, combined_entry, coordinators
     ):
-        """Offline devices from multiple groups are summed."""
+        """Total entity count sums across groups regardless of offline state."""
         mock_hass.data[DOMAIN] = {
             "entry_a": coordinators[0],
             "entry_b": coordinators[1],
         }
         coordinators[1]._device_states["binary_sensor.b1"].is_offline = True
         sensor = self._sensor(mock_hass, combined_entry, coordinators)
-        assert sensor.native_value == 2
+        assert sensor.native_value == 3
 
     def test_attributes_breakdown(self, mock_hass, combined_entry, coordinators):
         """extra_state_attributes has groups, totals and offline_entities."""
@@ -350,6 +350,12 @@ class TestCombinedGroupSensor:
         assert len(attrs["entities"]) == len(set(attrs["entities"])), (
             "entities must be deduplicated"
         )
+        assert "display_names" in attrs
+        assert set(attrs["display_names"].keys()) == {
+            "binary_sensor.a1",
+            "binary_sensor.a2",
+            "binary_sensor.b1",
+        }
 
     def test_attributes_entities_deduplicated(self, mock_hass, group_entry_a):
         """entities list has no duplicates when the same entity appears in two source groups."""
@@ -492,6 +498,84 @@ class TestCombinedGroupSensor:
         mock_hass.data[DOMAIN] = {}
         sensor = self._sensor(mock_hass, combined_entry, coordinators)
         assert sensor.unique_id == "combined_1_combined_summary"
+
+
+# ---------------------------------------------------------------------------
+# CombinedOfflineCountSensor
+# ---------------------------------------------------------------------------
+
+
+class TestCombinedOfflineCountSensor:
+    """Tests for CombinedOfflineCountSensor."""
+
+    def _sensor(self, hass, entry, coordinators):
+        return CombinedOfflineCountSensor(
+            hass,
+            entry,
+            "Combined",
+            "combined",
+            coordinators,
+            [c.entry.entry_id for c in coordinators],
+        )
+
+    def test_native_value_sums_offline(self, mock_hass, combined_entry, coordinators):
+        """native_value counts unsuppressed offline devices across groups."""
+        mock_hass.data[DOMAIN] = {
+            "entry_a": coordinators[0],
+            "entry_b": coordinators[1],
+        }
+        sensor = self._sensor(mock_hass, combined_entry, coordinators)
+        assert sensor.native_value == 1
+
+    def test_native_value_suppressed_excluded(
+        self, mock_hass, combined_entry, coordinators
+    ):
+        """Suppressed offline devices not counted."""
+        mock_hass.data[DOMAIN] = {
+            "entry_a": coordinators[0],
+            "entry_b": coordinators[1],
+        }
+        coordinators[0]._device_states["binary_sensor.a2"].is_suppressed = True
+        sensor = self._sensor(mock_hass, combined_entry, coordinators)
+        assert sensor.native_value == 0
+
+    def test_native_value_multiple_groups(
+        self, mock_hass, combined_entry, coordinators
+    ):
+        """Offline count sums across all groups."""
+        mock_hass.data[DOMAIN] = {
+            "entry_a": coordinators[0],
+            "entry_b": coordinators[1],
+        }
+        coordinators[1]._device_states["binary_sensor.b1"].is_offline = True
+        sensor = self._sensor(mock_hass, combined_entry, coordinators)
+        assert sensor.native_value == 2
+
+    def test_attributes(self, mock_hass, combined_entry, coordinators):
+        """extra_state_attributes has entities list and count."""
+        mock_hass.data[DOMAIN] = {
+            "entry_a": coordinators[0],
+            "entry_b": coordinators[1],
+        }
+        sensor = self._sensor(mock_hass, combined_entry, coordinators)
+        attrs = sensor.extra_state_attributes
+        assert attrs["count"] == 1
+        assert "binary_sensor.a2" in attrs["entities"]
+
+    def test_entity_id(self, mock_hass, combined_entry, coordinators):
+        """entity_id uses combined slug."""
+        mock_hass.data[DOMAIN] = {}
+        sensor = self._sensor(mock_hass, combined_entry, coordinators)
+        assert (
+            sensor.entity_id
+            == "sensor.entity_availability_combined_combined_offline_count"
+        )
+
+    def test_unique_id(self, mock_hass, combined_entry, coordinators):
+        """unique_id uses entry_id + suffix."""
+        mock_hass.data[DOMAIN] = {}
+        sensor = self._sensor(mock_hass, combined_entry, coordinators)
+        assert sensor.unique_id == "combined_1_combined_offline_count"
 
 
 # ---------------------------------------------------------------------------
@@ -760,8 +844,9 @@ class TestAsyncSetupEntry:
             added.extend(entities)
 
         await async_setup_entry(mock_hass, combined_entry, _fake_add)
-        assert len(added) == 6
+        assert len(added) == 7
         types = {type(s) for s in added}
+        assert CombinedOfflineCountSensor in types
         assert CombinedRecentlyOfflineSensor in types
         assert CombinedRecentlyRecoveredSensor in types
 
@@ -1395,3 +1480,116 @@ class TestCombinedRecentlyOfflineSensorWithDeviceNames:
             mock_dt.now.return_value = _NOW
             value = sensor.native_value
         assert value == "None"
+
+
+# ---------------------------------------------------------------------------
+# Branch coverage: _friendly_name with use_device_names=True
+# line 93->98: entity has no device_id → fallback to friendly_name
+# line 96->98: device found but has no name → fallback to friendly_name
+# ---------------------------------------------------------------------------
+
+
+class TestFriendlyNameBranches:
+    """Branch coverage for _friendly_name fallback paths."""
+
+    def _make_offline_sensor(self, hass, entry, coordinators):
+        from custom_components.entity_availability.combined_sensor import (
+            CombinedOfflineEntitiesSensor,
+        )
+
+        return CombinedOfflineEntitiesSensor(
+            hass,
+            entry,
+            "Combined",
+            "combined",
+            coordinators,
+            [c.entry.entry_id for c in coordinators],
+        )
+
+    def test_use_device_names_entity_has_no_device_id(
+        self, mock_hass, combined_entry, coordinators
+    ):
+        """use_device_names=True but entity has no device_id — falls back to friendly_name.
+
+        Covers: line 93->98 (entry.device_id is None → skip device lookup).
+        """
+        mock_hass.data[DOMAIN] = {
+            "entry_a": coordinators[0],
+            "entry_b": coordinators[1],
+        }
+        coordinators[0].entry = MockConfigEntry(
+            version=1,
+            domain=DOMAIN,
+            title="Group A",
+            data={**coordinators[0].entry.data, CONF_USE_DEVICE_NAMES: True},
+            entry_id="entry_a",
+        )
+        mock_hass.states.async_set(
+            "binary_sensor.a2",
+            "unavailable",
+            {"friendly_name": "Friendly A2"},
+        )
+
+        ent_reg_mock = MagicMock()
+        ent_entry = MagicMock()
+        ent_entry.device_id = None  # no device_id → branch 93->98
+        ent_reg_mock.async_get.return_value = ent_entry
+
+        with patch(
+            "custom_components.entity_availability.combined_sensor.er.async_get",
+            return_value=ent_reg_mock,
+        ):
+            sensor = self._make_offline_sensor(mock_hass, combined_entry, coordinators)
+            value = sensor.native_value
+
+        assert "Friendly A2" in value
+
+    def test_use_device_names_device_has_no_name(
+        self, mock_hass, combined_entry, coordinators
+    ):
+        """use_device_names=True, entity has device_id but device has no name — fallback.
+
+        Covers: line 96->98 (device found but name_by_user and name both falsy).
+        """
+        mock_hass.data[DOMAIN] = {
+            "entry_a": coordinators[0],
+            "entry_b": coordinators[1],
+        }
+        coordinators[0].entry = MockConfigEntry(
+            version=1,
+            domain=DOMAIN,
+            title="Group A",
+            data={**coordinators[0].entry.data, CONF_USE_DEVICE_NAMES: True},
+            entry_id="entry_a",
+        )
+        mock_hass.states.async_set(
+            "binary_sensor.a2",
+            "unavailable",
+            {"friendly_name": "Friendly A2"},
+        )
+
+        ent_reg_mock = MagicMock()
+        ent_entry = MagicMock()
+        ent_entry.device_id = "dev_nameless"
+        ent_reg_mock.async_get.return_value = ent_entry
+
+        dev_reg_mock = MagicMock()
+        device = MagicMock()
+        device.name_by_user = None
+        device.name = None  # no name → branch 96->98
+        dev_reg_mock.async_get.return_value = device
+
+        with (
+            patch(
+                "custom_components.entity_availability.combined_sensor.er.async_get",
+                return_value=ent_reg_mock,
+            ),
+            patch(
+                "custom_components.entity_availability.combined_sensor.dr.async_get",
+                return_value=dev_reg_mock,
+            ),
+        ):
+            sensor = self._make_offline_sensor(mock_hass, combined_entry, coordinators)
+            value = sensor.native_value
+
+        assert "Friendly A2" in value
