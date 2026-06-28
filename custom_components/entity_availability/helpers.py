@@ -19,7 +19,7 @@ def resolve_area_name(hass: HomeAssistant, entity_id: str) -> str | None:
     entry = ent_reg.async_get(entity_id)
     if not entry:
         return None
-    area_id = entry.area_id or None
+    area_id = entry.area_id
     if not area_id and entry.device_id:
         dev_reg = dr.async_get(hass)
         device = dev_reg.async_get(entry.device_id)

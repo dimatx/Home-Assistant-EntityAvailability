@@ -11,7 +11,6 @@ from typing import Any
 from homeassistant.components.sensor import SensorEntity, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import device_registry as dr, entity_registry as er  # noqa: F401
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -594,6 +593,7 @@ class CombinedAffectedAreasCountSensor(CombinedSensorBase):
 
     _attr_icon = "mdi:home-alert"
     _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_has_entity_name = True
 
     def __init__(
         self, hass, entry, group_name, group_slug, coordinators, combined_entry_ids
@@ -620,6 +620,7 @@ class CombinedAffectedAreasSensor(CombinedSensorBase):
     """Sensor showing sorted comma-separated areas with offline entities across all groups."""
 
     _attr_icon = "mdi:home-group"
+    _attr_has_entity_name = True
 
     def __init__(
         self, hass, entry, group_name, group_slug, coordinators, combined_entry_ids

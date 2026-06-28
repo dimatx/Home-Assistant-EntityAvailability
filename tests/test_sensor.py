@@ -1303,11 +1303,11 @@ class TestResolveDisplayName:
 
         with (
             patch(
-                "custom_components.entity_availability.sensor.er.async_get",
+                "custom_components.entity_availability.helpers.er.async_get",
                 return_value=mock_er,
             ),
             patch(
-                "custom_components.entity_availability.sensor.dr.async_get",
+                "custom_components.entity_availability.helpers.dr.async_get",
                 return_value=mock_dr,
             ),
         ):
@@ -1329,11 +1329,11 @@ class TestResolveDisplayName:
 
         with (
             patch(
-                "custom_components.entity_availability.sensor.er.async_get",
+                "custom_components.entity_availability.helpers.er.async_get",
                 return_value=mock_er,
             ),
             patch(
-                "custom_components.entity_availability.sensor.dr.async_get",
+                "custom_components.entity_availability.helpers.dr.async_get",
                 return_value=mock_dr,
             ),
         ):
@@ -1349,7 +1349,7 @@ class TestResolveDisplayName:
         mock_er.async_get.return_value = mock_entry
 
         with patch(
-            "custom_components.entity_availability.sensor.er.async_get",
+            "custom_components.entity_availability.helpers.er.async_get",
             return_value=mock_er,
         ):
             result = _resolve_display_name(mock_hass, "binary_sensor.device_a", True)
@@ -1367,11 +1367,11 @@ class TestResolveDisplayName:
 
         with (
             patch(
-                "custom_components.entity_availability.sensor.er.async_get",
+                "custom_components.entity_availability.helpers.er.async_get",
                 return_value=mock_er,
             ),
             patch(
-                "custom_components.entity_availability.sensor.dr.async_get",
+                "custom_components.entity_availability.helpers.dr.async_get",
                 return_value=mock_dr,
             ),
         ):
@@ -1393,11 +1393,11 @@ class TestResolveDisplayName:
 
         with (
             patch(
-                "custom_components.entity_availability.sensor.er.async_get",
+                "custom_components.entity_availability.helpers.er.async_get",
                 return_value=mock_er,
             ),
             patch(
-                "custom_components.entity_availability.sensor.dr.async_get",
+                "custom_components.entity_availability.helpers.dr.async_get",
                 return_value=mock_dr,
             ),
         ):
@@ -1410,7 +1410,7 @@ class TestResolveDisplayName:
         mock_er.async_get.return_value = None
 
         with patch(
-            "custom_components.entity_availability.sensor.er.async_get",
+            "custom_components.entity_availability.helpers.er.async_get",
             return_value=mock_er,
         ):
             result = _resolve_display_name(mock_hass, "binary_sensor.device_a", True)
@@ -1470,11 +1470,11 @@ class TestOfflineDevicesSensorWithDeviceNames:
 
         with (
             patch(
-                "custom_components.entity_availability.sensor.er.async_get",
+                "custom_components.entity_availability.helpers.er.async_get",
                 return_value=mock_er,
             ),
             patch(
-                "custom_components.entity_availability.sensor.dr.async_get",
+                "custom_components.entity_availability.helpers.dr.async_get",
                 return_value=mock_dr,
             ),
         ):
@@ -1508,7 +1508,7 @@ class TestOfflineDevicesSensorWithDeviceNames:
         sensor.hass = mock_hass
 
         with patch(
-            "custom_components.entity_availability.sensor.er.async_get",
+            "custom_components.entity_availability.helpers.er.async_get",
             return_value=mock_er,
         ):
             value = sensor.native_value
@@ -1569,11 +1569,11 @@ class TestRecentlyOfflineSensorWithDeviceNames:
 
         with (
             patch(
-                "custom_components.entity_availability.sensor.er.async_get",
+                "custom_components.entity_availability.helpers.er.async_get",
                 return_value=mock_er,
             ),
             patch(
-                "custom_components.entity_availability.sensor.dr.async_get",
+                "custom_components.entity_availability.helpers.dr.async_get",
                 return_value=mock_dr,
             ),
         ):
@@ -1596,7 +1596,7 @@ class TestRecentlyOfflineSensorWithDeviceNames:
         sensor.hass = mock_hass
 
         with patch(
-            "custom_components.entity_availability.sensor.er.async_get",
+            "custom_components.entity_availability.helpers.er.async_get",
             return_value=mock_er,
         ):
             value = sensor.native_value
@@ -1657,11 +1657,11 @@ class TestRecentlyRecoveredSensorWithDeviceNames:
 
         with (
             patch(
-                "custom_components.entity_availability.sensor.er.async_get",
+                "custom_components.entity_availability.helpers.er.async_get",
                 return_value=mock_er,
             ),
             patch(
-                "custom_components.entity_availability.sensor.dr.async_get",
+                "custom_components.entity_availability.helpers.dr.async_get",
                 return_value=mock_dr,
             ),
         ):
@@ -1684,7 +1684,7 @@ class TestRecentlyRecoveredSensorWithDeviceNames:
         sensor.hass = mock_hass
 
         with patch(
-            "custom_components.entity_availability.sensor.er.async_get",
+            "custom_components.entity_availability.helpers.er.async_get",
             return_value=mock_er,
         ):
             value = sensor.native_value

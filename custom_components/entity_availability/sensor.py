@@ -12,7 +12,6 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity import Entity
-from homeassistant.helpers import device_registry as dr, entity_registry as er  # noqa: F401
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 
 from .const import (
@@ -756,9 +755,10 @@ class AffectedAreasRecentlyOfflineSensor(DedupCoordinatorSensor):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
+        areas = self._refresh_cache()
         return {
-            "areas": self._cached_areas,
-            "count": len(self._cached_areas),
+            "areas": areas,
+            "count": len(areas),
             "window_minutes": self.coordinator.recovery_window_minutes,
         }
 
@@ -825,8 +825,9 @@ class AffectedAreasRecentlyRecoveredSensor(DedupCoordinatorSensor):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
+        areas = self._refresh_cache()
         return {
-            "areas": self._cached_areas,
-            "count": len(self._cached_areas),
+            "areas": areas,
+            "count": len(areas),
             "window_minutes": self.coordinator.recovery_window_minutes,
         }

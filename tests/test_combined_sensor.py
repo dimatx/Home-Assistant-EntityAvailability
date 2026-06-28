@@ -1369,11 +1369,11 @@ class TestCombinedOfflineEntitiesSensorWithDeviceNames:
 
         with (
             patch(
-                "custom_components.entity_availability.combined_sensor.er.async_get",
+                "custom_components.entity_availability.helpers.er.async_get",
                 return_value=ent_reg_mock,
             ),
             patch(
-                "custom_components.entity_availability.combined_sensor.dr.async_get",
+                "custom_components.entity_availability.helpers.dr.async_get",
                 return_value=dev_reg_mock,
             ),
         ):
@@ -1456,11 +1456,11 @@ class TestCombinedRecentlyOfflineSensorWithDeviceNames:
 
         with (
             patch(
-                "custom_components.entity_availability.combined_sensor.er.async_get",
+                "custom_components.entity_availability.helpers.er.async_get",
                 return_value=ent_reg_mock,
             ),
             patch(
-                "custom_components.entity_availability.combined_sensor.dr.async_get",
+                "custom_components.entity_availability.helpers.dr.async_get",
                 return_value=dev_reg_mock,
             ),
             patch(
@@ -1540,7 +1540,7 @@ class TestFriendlyNameBranches:
         ent_reg_mock.async_get.return_value = ent_entry
 
         with patch(
-            "custom_components.entity_availability.combined_sensor.er.async_get",
+            "custom_components.entity_availability.helpers.er.async_get",
             return_value=ent_reg_mock,
         ):
             sensor = self._make_offline_sensor(mock_hass, combined_entry, coordinators)
@@ -1585,11 +1585,11 @@ class TestFriendlyNameBranches:
 
         with (
             patch(
-                "custom_components.entity_availability.combined_sensor.er.async_get",
+                "custom_components.entity_availability.helpers.er.async_get",
                 return_value=ent_reg_mock,
             ),
             patch(
-                "custom_components.entity_availability.combined_sensor.dr.async_get",
+                "custom_components.entity_availability.helpers.dr.async_get",
                 return_value=dev_reg_mock,
             ),
         ):
