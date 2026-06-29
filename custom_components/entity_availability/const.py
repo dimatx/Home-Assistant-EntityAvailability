@@ -44,3 +44,7 @@ STARTUP_GRACE_PERIOD = 60  # seconds
 # Recovery window for recently_recovered / recently_offline sensors
 CONF_RECOVERY_WINDOW = "recovery_window"
 DEFAULT_RECOVERY_WINDOW = 5  # minutes
+
+# Sentinel area name for entities with no HA area assigned.
+# Parentheses signal "not a real area" and avoid colliding with user-created area names.
+NO_AREA_SENTINEL = "(No Area)"

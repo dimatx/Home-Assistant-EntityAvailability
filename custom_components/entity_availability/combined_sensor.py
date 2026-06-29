@@ -11,7 +11,6 @@ from typing import Any
 from homeassistant.components.sensor import SensorEntity, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -21,8 +20,10 @@ from .const import (
     CONF_GROUP_NAME,
     CONF_USE_DEVICE_NAMES,
     DOMAIN,
+    NO_AREA_SENTINEL,
 )
 from .coordinator import EntityAvailabilityCoordinator
+from .helpers import resolve_area_name, resolve_display_name
 from .write_dedup import WriteDedupMixin
 
 _LOGGER = logging.getLogger(__name__)
@@ -69,6 +70,18 @@ async def async_setup_entry(
             CombinedRecentlyRecoveredSensor(
                 hass, entry, group_name, group_slug, coordinators, combined_entry_ids
             ),
+            CombinedAffectedAreasCountSensor(
+                hass, entry, group_name, group_slug, coordinators, combined_entry_ids
+            ),
+            CombinedAffectedAreasSensor(
+                hass, entry, group_name, group_slug, coordinators, combined_entry_ids
+            ),
+            CombinedAffectedAreasRecentlyOfflineSensor(
+                hass, entry, group_name, group_slug, coordinators, combined_entry_ids
+            ),
+            CombinedAffectedAreasRecentlyRecoveredSensor(
+                hass, entry, group_name, group_slug, coordinators, combined_entry_ids
+            ),
         ]
     )
 
@@ -85,20 +98,7 @@ def _device_info(entry_id: str, group_name: str) -> DeviceInfo:
 def _friendly_name(
     hass: HomeAssistant, entity_id: str, use_device_names: bool = False
 ) -> str:
-    # ponytail: duplicate of _resolve_display_name in sensor.py — module-level
-    # circular import prevents sharing (sensor.py imports combined_sensor.py).
-    if use_device_names:
-        ent_reg = er.async_get(hass)
-        entry = ent_reg.async_get(entity_id)
-        if entry and entry.device_id:
-            dev_reg = dr.async_get(hass)
-            device = dev_reg.async_get(entry.device_id)
-            if device and (device.name_by_user or device.name):
-                return device.name_by_user or device.name
-    state = hass.states.get(entity_id)
-    if state and state.attributes.get("friendly_name"):
-        return state.attributes["friendly_name"]
-    return entity_id.split(".")[-1].replace("_", " ").title()
+    return resolve_display_name(hass, entity_id, use_device_names)
 
 
 class CombinedSensorBase(WriteDedupMixin, SensorEntity):
@@ -586,3 +586,202 @@ class CombinedRecentlyRecoveredSensor(CombinedSensorBase):
     def extra_state_attributes(self) -> dict[str, Any]:
         pairs = self._matching_devices()
         return {"entities": [d.entity_id for _, d in pairs], "count": len(pairs)}
+
+
+class CombinedAffectedAreasCountSensor(CombinedSensorBase):
+    """Sensor showing count of unique areas with offline entities across all groups."""
+
+    _attr_icon = "mdi:home-alert"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_has_entity_name = True
+
+    def __init__(
+        self, hass, entry, group_name, group_slug, coordinators, combined_entry_ids
+    ):
+        super().__init__(
+            hass, entry, group_name, group_slug, coordinators, combined_entry_ids
+        )
+        self._attr_unique_id = f"{entry.entry_id}_combined_affected_areas_count"
+        self.entity_id = f"sensor.entity_availability_combined_{self._group_slug}_affected_areas_count"
+        self._attr_name = "Affected Areas Count"
+
+    @property
+    def native_value(self) -> int:
+        areas: set[str] = set()
+        for coord in self._active_coordinators():
+            for d in coord.device_states.values():
+                if d.is_offline and not d.is_suppressed:
+                    area = resolve_area_name(self.hass, d.entity_id)
+                    areas.add(area if area else NO_AREA_SENTINEL)
+        return len(areas)
+
+
+class CombinedAffectedAreasSensor(CombinedSensorBase):
+    """Sensor showing sorted comma-separated areas with offline entities across all groups."""
+
+    _attr_icon = "mdi:home-group"
+    _attr_has_entity_name = True
+
+    def __init__(
+        self, hass, entry, group_name, group_slug, coordinators, combined_entry_ids
+    ):
+        super().__init__(
+            hass, entry, group_name, group_slug, coordinators, combined_entry_ids
+        )
+        self._attr_unique_id = f"{entry.entry_id}_combined_affected_areas"
+        self.entity_id = (
+            f"sensor.entity_availability_combined_{self._group_slug}_affected_areas"
+        )
+        self._attr_name = "Affected Areas"
+        self._cached_areas: list[str] = []
+        self._cached_unassigned: list[str] = []
+
+    def _refresh_cache(self) -> list[str]:
+        areas: set[str] = set()
+        unassigned: list[str] = []
+        for coord in self._active_coordinators():
+            for d in coord.device_states.values():
+                if d.is_offline and not d.is_suppressed:
+                    area = resolve_area_name(self.hass, d.entity_id)
+                    if area:
+                        areas.add(area)
+                    else:
+                        areas.add(NO_AREA_SENTINEL)
+                        unassigned.append(d.entity_id)
+        self._cached_areas = sorted(areas)
+        self._cached_unassigned = unassigned
+        return self._cached_areas
+
+    @property
+    def native_value(self) -> str:
+        areas = self._refresh_cache()
+        if not areas:
+            return "None"
+        result = ", ".join(areas)
+        return (
+            result[: MAX_STATE_LENGTH - 3] + "..."
+            if len(result) > MAX_STATE_LENGTH - 3
+            else result
+        )
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return {
+            "areas": self._cached_areas,
+            "count": len(self._cached_areas),
+            "unassigned_entities": self._cached_unassigned,
+        }
+
+
+class CombinedAffectedAreasRecentlyOfflineSensor(CombinedSensorBase):
+    """Sensor showing areas where an entity went offline within the window across all groups."""
+
+    _attr_icon = "mdi:home-clock"
+    _attr_has_entity_name = True
+
+    def __init__(
+        self, hass, entry, group_name, group_slug, coordinators, combined_entry_ids
+    ):
+        super().__init__(
+            hass, entry, group_name, group_slug, coordinators, combined_entry_ids
+        )
+        self._attr_unique_id = (
+            f"{entry.entry_id}_combined_affected_areas_recently_offline"
+        )
+        self.entity_id = f"sensor.entity_availability_combined_{self._group_slug}_affected_areas_recently_offline"
+        self._attr_name = "Areas Recently Offline"
+
+    def _matching_areas(self) -> list[str]:
+        now = datetime.now(timezone.utc)
+        areas: set[str] = set()
+        for coord in self._active_coordinators():
+            cutoff = coord.recovery_window_minutes * 60
+            for d in coord.device_states.values():
+                if (
+                    d.is_offline
+                    and not d.is_suppressed
+                    and d.recently_offline_at is not None
+                    and (now - d.recently_offline_at).total_seconds() <= cutoff
+                ):
+                    area = resolve_area_name(self.hass, d.entity_id)
+                    areas.add(area if area else NO_AREA_SENTINEL)
+        return sorted(areas)
+
+    @property
+    def native_value(self) -> str:
+        areas = self._matching_areas()
+        if not areas:
+            return "None"
+        result = ", ".join(areas)
+        return (
+            result[: MAX_STATE_LENGTH - 3] + "..."
+            if len(result) > MAX_STATE_LENGTH - 3
+            else result
+        )
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        areas = self._matching_areas()
+        return {"areas": areas, "count": len(areas)}
+
+
+class CombinedAffectedAreasRecentlyRecoveredSensor(CombinedSensorBase):
+    """Sensor showing areas fully recovered within the window across all groups."""
+
+    _attr_icon = "mdi:home-heart"
+    _attr_has_entity_name = True
+
+    def __init__(
+        self, hass, entry, group_name, group_slug, coordinators, combined_entry_ids
+    ):
+        super().__init__(
+            hass, entry, group_name, group_slug, coordinators, combined_entry_ids
+        )
+        self._attr_unique_id = (
+            f"{entry.entry_id}_combined_affected_areas_recently_recovered"
+        )
+        self.entity_id = f"sensor.entity_availability_combined_{self._group_slug}_affected_areas_recently_recovered"
+        self._attr_name = "Areas Recently Recovered"
+
+    def _matching_areas(self) -> list[str]:
+        now = datetime.now(timezone.utc)
+
+        # Build combined area → [(coord, device)] across all active coordinators
+        area_pairs: dict[str, list] = {}
+        for coord in self._active_coordinators():
+            for d in coord.device_states.values():
+                if d.is_suppressed:
+                    continue
+                area = resolve_area_name(self.hass, d.entity_id) or NO_AREA_SENTINEL
+                area_pairs.setdefault(area, []).append((coord, d))
+
+        recovered: list[str] = []
+        for area, pairs in area_pairs.items():
+            if any(d.is_offline for _, d in pairs):
+                continue
+            if any(
+                d.last_recovery is not None
+                and (now - d.last_recovery).total_seconds()
+                <= coord.recovery_window_minutes * 60
+                for coord, d in pairs
+            ):
+                recovered.append(area)
+
+        return sorted(recovered)
+
+    @property
+    def native_value(self) -> str:
+        areas = self._matching_areas()
+        if not areas:
+            return "None"
+        result = ", ".join(areas)
+        return (
+            result[: MAX_STATE_LENGTH - 3] + "..."
+            if len(result) > MAX_STATE_LENGTH - 3
+            else result
+        )
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        areas = self._matching_areas()
+        return {"areas": areas, "count": len(areas)}

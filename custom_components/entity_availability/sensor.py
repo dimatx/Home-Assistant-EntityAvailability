@@ -13,7 +13,6 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
-from homeassistant.helpers import entity_registry as er, device_registry as dr
 
 from .const import (
     CONF_AVAILABILITY_WINDOWS,
@@ -26,8 +25,10 @@ from .const import (
     DEFAULT_BATTERY_THRESHOLD,
     DOMAIN,
     ENTRY_TYPE_COMBINED,
+    NO_AREA_SENTINEL,
 )
 from .coordinator import EntityAvailabilityCoordinator
+from .helpers import resolve_area_name, resolve_display_name
 from .write_dedup import DedupCoordinatorSensor
 
 _LOGGER = logging.getLogger(__name__)
@@ -38,21 +39,8 @@ MAX_STATE_LENGTH = 255
 def _resolve_display_name(
     hass: HomeAssistant, entity_id: str, use_device_names: bool = False
 ) -> str:
-    """Return a display name for entity_id.
-
-    If use_device_names is True, prefer the device name from the device registry.
-    Falls back to friendly_name state attribute, then to an entity_id slug.
-    """
-    if use_device_names:
-        entry = er.async_get(hass).async_get(entity_id)
-        if entry and entry.device_id:
-            device = dr.async_get(hass).async_get(entry.device_id)
-            if device and (device.name_by_user or device.name):
-                return device.name_by_user or device.name
-    state = hass.states.get(entity_id)
-    if state and state.attributes.get("friendly_name"):
-        return state.attributes["friendly_name"]
-    return entity_id.split(".")[-1].replace("_", " ").title()
+    """Return a display name for entity_id."""
+    return resolve_display_name(hass, entity_id, use_device_names)
 
 
 async def async_setup_entry(
@@ -88,6 +76,21 @@ async def async_setup_entry(
         RecentlyOfflineSensor(coordinator, group_name, group_slug, entry.entry_id),
         RecentlyRecoveredSensor(coordinator, group_name, group_slug, entry.entry_id),
     ]
+
+    entities.extend(
+        [
+            AffectedAreasCountSensor(
+                coordinator, group_name, group_slug, entry.entry_id
+            ),
+            AffectedAreasSensor(coordinator, group_name, group_slug, entry.entry_id),
+            AffectedAreasRecentlyOfflineSensor(
+                coordinator, group_name, group_slug, entry.entry_id
+            ),
+            AffectedAreasRecentlyRecoveredSensor(
+                coordinator, group_name, group_slug, entry.entry_id
+            ),
+        ]
+    )
 
     battery_threshold = entry.data.get(
         CONF_BATTERY_THRESHOLD, DEFAULT_BATTERY_THRESHOLD
@@ -613,5 +616,218 @@ class RecentlyRecoveredSensor(DedupCoordinatorSensor):
         return {
             "entities": [d.entity_id for d in devices],
             "count": len(devices),
+            "window_minutes": self.coordinator.recovery_window_minutes,
+        }
+
+
+class AffectedAreasCountSensor(DedupCoordinatorSensor):
+    """Sensor showing count of unique areas with offline entities."""
+
+    _attr_icon = "mdi:home-alert"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        coordinator: EntityAvailabilityCoordinator,
+        group_name: str,
+        group_slug: str,
+        entry_id: str,
+    ) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{entry_id}_affected_areas_count"
+        self.entity_id = f"sensor.entity_availability_{group_slug}_affected_areas_count"
+        self._attr_name = "Affected Areas Count"
+        self._attr_device_info = _device_info(entry_id, group_slug, group_name)
+
+    @property
+    def native_value(self) -> int:
+        areas = {
+            resolve_area_name(self.hass, d.entity_id) or NO_AREA_SENTINEL
+            for d in self.coordinator.device_states.values()
+            if d.is_offline and not d.is_suppressed
+        }
+        return len(areas)
+
+
+class AffectedAreasSensor(DedupCoordinatorSensor):
+    """Sensor showing sorted comma-separated list of areas with offline entities."""
+
+    _attr_icon = "mdi:home-group"
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        coordinator: EntityAvailabilityCoordinator,
+        group_name: str,
+        group_slug: str,
+        entry_id: str,
+    ) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{entry_id}_affected_areas"
+        self.entity_id = f"sensor.entity_availability_{group_slug}_affected_areas"
+        self._attr_name = "Affected Areas"
+        self._attr_device_info = _device_info(entry_id, group_slug, group_name)
+        self._cached_areas: list[str] = []
+        self._cached_unassigned: list[str] = []
+
+    def _refresh_cache(self) -> list[str]:
+        areas: set[str] = set()
+        unassigned: list[str] = []
+        for d in self.coordinator.device_states.values():
+            if d.is_offline and not d.is_suppressed:
+                area = resolve_area_name(self.hass, d.entity_id)
+                if area:
+                    areas.add(area)
+                else:
+                    areas.add(NO_AREA_SENTINEL)
+                    unassigned.append(d.entity_id)
+        self._cached_areas = sorted(areas)
+        self._cached_unassigned = unassigned
+        return self._cached_areas
+
+    @property
+    def native_value(self) -> str:
+        areas = self._refresh_cache()
+        if not areas:
+            return "None"
+        result = ", ".join(areas)
+        if len(result) > MAX_STATE_LENGTH - 3:
+            result = result[: MAX_STATE_LENGTH - 3] + "..."
+        return result
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return {
+            "areas": self._cached_areas,
+            "count": len(self._cached_areas),
+            "unassigned_entities": self._cached_unassigned,
+        }
+
+
+class AffectedAreasRecentlyOfflineSensor(DedupCoordinatorSensor):
+    """Sensor showing areas where an entity went offline within the recovery window."""
+
+    _attr_icon = "mdi:home-clock"
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        coordinator: EntityAvailabilityCoordinator,
+        group_name: str,
+        group_slug: str,
+        entry_id: str,
+    ) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{entry_id}_affected_areas_recently_offline"
+        self.entity_id = (
+            f"sensor.entity_availability_{group_slug}_affected_areas_recently_offline"
+        )
+        self._attr_name = "Areas Recently Offline"
+        self._attr_device_info = _device_info(entry_id, group_slug, group_name)
+        self._cached_areas: list[str] = []
+
+    def _refresh_cache(self) -> list[str]:
+        now = datetime.now(timezone.utc)
+        cutoff = self.coordinator.recovery_window_minutes * 60
+        areas: set[str] = set()
+        for d in self.coordinator.device_states.values():
+            if (
+                d.is_offline
+                and not d.is_suppressed
+                and d.recently_offline_at is not None
+                and (now - d.recently_offline_at).total_seconds() <= cutoff
+            ):
+                area = resolve_area_name(self.hass, d.entity_id)
+                areas.add(area if area else NO_AREA_SENTINEL)
+        self._cached_areas = sorted(areas)
+        return self._cached_areas
+
+    @property
+    def native_value(self) -> str:
+        areas = self._refresh_cache()
+        if not areas:
+            return "None"
+        result = ", ".join(areas)
+        if len(result) > MAX_STATE_LENGTH - 3:
+            result = result[: MAX_STATE_LENGTH - 3] + "..."
+        return result
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        areas = self._refresh_cache()
+        return {
+            "areas": areas,
+            "count": len(areas),
+            "window_minutes": self.coordinator.recovery_window_minutes,
+        }
+
+
+class AffectedAreasRecentlyRecoveredSensor(DedupCoordinatorSensor):
+    """Sensor showing areas where all entities recovered within the recovery window."""
+
+    _attr_icon = "mdi:home-heart"
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        coordinator: EntityAvailabilityCoordinator,
+        group_name: str,
+        group_slug: str,
+        entry_id: str,
+    ) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{entry_id}_affected_areas_recently_recovered"
+        self.entity_id = (
+            f"sensor.entity_availability_{group_slug}_affected_areas_recently_recovered"
+        )
+        self._attr_name = "Areas Recently Recovered"
+        self._attr_device_info = _device_info(entry_id, group_slug, group_name)
+        self._cached_areas: list[str] = []
+
+    def _refresh_cache(self) -> list[str]:
+        now = datetime.now(timezone.utc)
+        cutoff = self.coordinator.recovery_window_minutes * 60
+
+        # Build area → list[DeviceState] for non-suppressed devices
+        area_devices: dict[str, list] = {}
+        for d in self.coordinator.device_states.values():
+            if d.is_suppressed:
+                continue
+            area = resolve_area_name(self.hass, d.entity_id) or NO_AREA_SENTINEL
+            area_devices.setdefault(area, []).append(d)
+
+        recovered: list[str] = []
+        for area, devices in area_devices.items():
+            # All devices in this area must be online
+            if any(d.is_offline for d in devices):
+                continue
+            # At least one must have recovered within the window
+            if any(
+                d.last_recovery is not None
+                and (now - d.last_recovery).total_seconds() <= cutoff
+                for d in devices
+            ):
+                recovered.append(area)
+
+        self._cached_areas = sorted(recovered)
+        return self._cached_areas
+
+    @property
+    def native_value(self) -> str:
+        areas = self._refresh_cache()
+        if not areas:
+            return "None"
+        result = ", ".join(areas)
+        if len(result) > MAX_STATE_LENGTH - 3:
+            result = result[: MAX_STATE_LENGTH - 3] + "..."
+        return result
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        areas = self._refresh_cache()
+        return {
+            "areas": areas,
+            "count": len(areas),
             "window_minutes": self.coordinator.recovery_window_minutes,
         }
