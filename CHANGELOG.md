@@ -17,6 +17,9 @@ All notable changes to this project will be documented in this file.
   - No new configuration required — sensors appear automatically on update and reuse the group's existing `recovery_window_minutes` setting.
   - Entities are excluded if suppressed, consistent with all other sensors.
 
+### Changed
+- **Card: Affected Areas pill row** — new opt-in section in the Lovelace card. When `show_affected_areas: true` (off by default), a compact pill row appears between the stats and availability sections listing offline area names. Named areas render in red; entities with no area assigned appear as italic "Unassigned". Works identically for regular and combined groups. Toggle via the card editor "Show Affected Areas" checkbox.
+
 ## [0.3.10] - 2026-06-28
 
 ### Added
