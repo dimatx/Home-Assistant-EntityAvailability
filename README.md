@@ -6,6 +6,8 @@
 <a href="https://www.home-assistant.io/"><img src="https://img.shields.io/badge/Home%20Assistant-2024.1%2B-blue.svg" alt="Home Assistant"></a>
 <a href="https://github.com/italo-lombardi/Home-Assistant-EntityAvailability/blob/main/LICENSE"><img src="https://img.shields.io/github/license/italo-lombardi/Home-Assistant-EntityAvailability?logo=gnu&logoColor=white" alt="License"></a>
 <img src="https://img.shields.io/badge/coverage-100%25-brightgreen" alt="Test Coverage">
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/italolombardi)
+[![PayPal](https://img.shields.io/badge/PayPal-00457C?style=flat&logo=paypal&logoColor=white)](https://paypal.me/ItaloLombardi)
 
 [![Add to HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=italo-lombardi&repository=Home-Assistant-EntityAvailability&category=integration)
 [![Add to Home Assistant](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=entity_availability)
@@ -772,6 +774,9 @@ A: Yes. Use the `entity_availability.suppress` service in any automation or scri
 
 **Q: How do I access all sensor values in templates?**
 A: Use `states()` for the main value and `state_attr()` for attributes. Example: `{{ state_attr('sensor.entity_availability_security_devices_group_summary', 'online') }}`
+
+**Q: Home Assistant reports a repair "... no longer has a state class" for a Group/Combined Summary sensor. What do I do?**
+A: Expected after upgrading to v0.3.12. The `Group Summary` and `Combined Summary` sensors used to generate long-term statistics for a value (entity count) that rarely changes, bloating the recorder database. That was removed. Open **Settings → System → Repairs** and resolve the issue to purge the orphaned statistics rows, or delete them via **Developer Tools → Statistics**. The sensors keep working normally — only their unused statistics history is cleared.
 
 ---
 
