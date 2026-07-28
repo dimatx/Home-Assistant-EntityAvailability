@@ -4,12 +4,10 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
-
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.entity_availability.const import (
@@ -33,7 +31,6 @@ from custom_components.entity_availability.const import (
     ENTRY_TYPE_COMBINED,
     ENTRY_TYPE_GROUP,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -1075,27 +1072,28 @@ class TestUseDeviceNamesConfigFlow:
 
     async def test_use_device_names_in_options_flow(self, hass):
         """Test use_device_names flag survives options flow round-trip."""
+        from pytest_homeassistant_custom_component.common import MockConfigEntry
+
         from custom_components.entity_availability.const import (
-            CONF_USE_DEVICE_NAMES,
-            CONF_GROUP_NAME,
-            CONF_ENTITIES,
-            CONF_BAD_STATES,
-            CONF_COOLDOWN,
-            CONF_STALENESS_THRESHOLD,
-            CONF_BATTERY_THRESHOLD,
             CONF_AVAILABILITY_WINDOWS,
+            CONF_BAD_STATES,
             CONF_BATTERY_ENTITY_MAP,
+            CONF_BATTERY_THRESHOLD,
+            CONF_COOLDOWN,
+            CONF_ENTITIES,
+            CONF_ENTRY_TYPE,
+            CONF_GROUP_NAME,
             CONF_RECOVERY_WINDOW,
+            CONF_STALENESS_THRESHOLD,
+            CONF_USE_DEVICE_NAMES,
+            DEFAULT_AVAILABILITY_WINDOWS,
             DEFAULT_BAD_STATES,
             DEFAULT_COOLDOWN,
-            DEFAULT_STALENESS_THRESHOLD,
-            DEFAULT_AVAILABILITY_WINDOWS,
             DEFAULT_RECOVERY_WINDOW,
+            DEFAULT_STALENESS_THRESHOLD,
             DOMAIN,
             ENTRY_TYPE_GROUP,
-            CONF_ENTRY_TYPE,
         )
-        from pytest_homeassistant_custom_component.common import MockConfigEntry
 
         entry = MockConfigEntry(
             version=1,
@@ -1119,7 +1117,7 @@ class TestUseDeviceNamesConfigFlow:
         entry.add_to_hass(hass)
         result = await hass.config_entries.options.async_init(entry.entry_id)
         assert result["type"] == "form"
-        schema_keys = [str(k) for k in result["data_schema"].schema.keys()]
+        schema_keys = [str(k) for k in result["data_schema"].schema]
         assert any("use_device_names" in k for k in schema_keys)
 
 
@@ -1234,7 +1232,7 @@ async def test_detect_battery_entity_guessed_name_found_in_config_flow(
 
 
 # ---------------------------------------------------------------------------
-# Branch coverage: options flow _detect_battery_entity (lines 474->476, 502->507)
+# Branch coverage: options flow _detect_battery_entity (lines 493->498, 527->528/530)
 # ---------------------------------------------------------------------------
 
 
@@ -1242,10 +1240,10 @@ async def test_options_flow_detect_battery_entity_no_existing_map(
     hass: HomeAssistant,
     mock_config_entry,
 ) -> None:
-    """Options flow calls _detect_battery_entity when no existing map default.
+    """Options flow calls _detect_battery_entity when entity absent from existing map.
 
-    Covers: 474->476 (empty existing_map triggers _detect_battery_entity call),
-            502->507 (guessed battery state found in options flow variant).
+    Covers: 493->498 (entity_id not in existing_map → else branch → _detect_battery_entity),
+            527->528 (guessed battery state found in states → return battery_entity).
     """
     from unittest.mock import MagicMock, patch
 
@@ -1335,7 +1333,8 @@ async def test_options_flow_detect_battery_no_guessed_state(
 ) -> None:
     """Options flow: no existing map, no guessed battery state — returns ''.
 
-    Covers: 474->476 (empty map → detect called) and 502->507 (no guessed state → return '').
+    Covers: 493->498 (entity absent from existing_map → _detect_battery_entity called),
+            527->530 (guessed entity absent in states → fall through to return '').
     """
     from unittest.mock import MagicMock, patch
 
@@ -1436,9 +1435,9 @@ async def test_options_flow_existing_map_default_skips_detect(
     hass: HomeAssistant,
     mock_config_entry,
 ) -> None:
-    """Options flow: entity has existing map default — _detect_battery_entity skipped.
+    """Options flow: entity has existing map entry — _detect_battery_entity skipped.
 
-    Covers: 474->476 (default exists → if not default is False → skip detect call).
+    Covers: 493->495 (entity_id in existing_map → if-branch taken → use stored value).
     """
     from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -1502,7 +1501,7 @@ async def test_options_flow_no_guessed_state_returns_empty(
 ) -> None:
     """Options flow: _detect_battery_entity returns '' — guessed state absent.
 
-    Covers: 502->507 (guessed entity absent → condition False → return '').
+    Covers: 527->530 (guessed entity absent in states → condition False → return '').
     """
     from unittest.mock import MagicMock, patch
 
@@ -1610,10 +1609,16 @@ async def test_options_flow_cleared_mapping_stays_cleared(
 
     # The schema for device_a must NOT carry a suggested_value (the user cleared it).
     schema = result["data_schema"]
+    found = False
     for key in schema.schema:
         if getattr(key, "schema", key) == "binary_sensor.device_a":
-            assert key.description is None or key.description.get("suggested_value", "") == ""
+            assert (
+                key.description is None
+                or key.description.get("suggested_value", "") == ""
+            )
+            found = True
             break
+    assert found, "binary_sensor.device_a was not found in the battery_mapping schema"
 
     # Submit without filling in the field — the cleared mapping must be preserved.
     with patch(
@@ -1656,7 +1661,9 @@ async def test_options_flow_new_entity_still_gets_suggestion(
             CONF_STALENESS_THRESHOLD: DEFAULT_STALENESS_THRESHOLD,
             CONF_BATTERY_THRESHOLD: 20,
             CONF_AVAILABILITY_WINDOWS: DEFAULT_AVAILABILITY_WINDOWS,
-            CONF_BATTERY_ENTITY_MAP: {"binary_sensor.device_a": "sensor.device_a_battery"},
+            CONF_BATTERY_ENTITY_MAP: {
+                "binary_sensor.device_a": "sensor.device_a_battery"
+            },
             CONF_RECOVERY_WINDOW: DEFAULT_RECOVERY_WINDOW,
             CONF_USE_DEVICE_NAMES: False,
         },

@@ -6,10 +6,8 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 from homeassistant.const import STATE_ON, STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant, State
-
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.entity_availability.const import (
@@ -79,7 +77,7 @@ async def test_state_change_online_device(
         await coord._async_update_data()
 
     # All devices are STATE_ON, so none should be offline
-    for entity_id, device in coord.device_states.items():
+    for device in coord.device_states.values():
         assert device.is_offline is False
         assert device.is_degraded is False
 
@@ -571,7 +569,7 @@ async def test_debounce_cancel_on_rapid_state_changes(
 
             return cancel, called
 
-        first_cancel, first_called = make_cancel()
+        first_cancel, _ = make_cancel()
         second_cancel, _ = make_cancel()
 
         with patch(
@@ -1942,11 +1940,13 @@ async def test_debounced_refresh_callback_creates_task(
     assert len(captured_callbacks) == 1
 
     # Now invoke the callback: entry removed from map and refresh scheduled
-    with patch.object(coord, "async_request_refresh", new_callable=AsyncMock):
-        with patch.object(
+    with (
+        patch.object(coord, "async_request_refresh", new_callable=AsyncMock),
+        patch.object(
             hass, "async_create_task", side_effect=lambda coro: coro.close()
-        ) as mock_task:
-            captured_callbacks[0](None)  # simulate the timer firing
+        ) as mock_task,
+    ):
+        captured_callbacks[0](None)  # simulate the timer firing
 
     assert "unknown" not in coord._debounce_cancel_map
     mock_task.assert_called_once()

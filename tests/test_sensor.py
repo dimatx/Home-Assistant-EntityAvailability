@@ -5,14 +5,11 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from freezegun import freeze_time
-
 import pytest
-
+from freezegun import freeze_time
 from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.const import STATE_UNAVAILABLE, EntityCategory
 from homeassistant.core import HomeAssistant
-
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.entity_availability.const import (
@@ -27,6 +24,7 @@ from custom_components.entity_availability.coordinator import (
 )
 from custom_components.entity_availability.models import DeviceState
 from custom_components.entity_availability.sensor import (
+    MAX_STATE_LENGTH,
     AffectedAreasCountSensor,
     AffectedAreasRecentlyOfflineSensor,
     AffectedAreasRecentlyRecoveredSensor,
@@ -35,13 +33,12 @@ from custom_components.entity_availability.sensor import (
     DegradedDevicesSensor,
     GroupSummarySensor,
     LowBatteryCountSensor,
-    MAX_STATE_LENGTH,
+    MTBFSensor,
     MTTRSensor,
     OfflineCountSensor,
     OfflineDevicesSensor,
     RecentlyOfflineSensor,
     RecentlyRecoveredSensor,
-    MTBFSensor,
     async_setup_entry,
 )
 
@@ -595,7 +592,7 @@ class TestRecentlyOfflineSensor:
             mock_coordinator, "Test Group", "test_group", "test_entry_id"
         )
         sensor.hass = mock_hass
-        sensor.native_value
+        _ = sensor.native_value
         attrs = sensor.extra_state_attributes
         assert "binary_sensor.device_b" in attrs["entities"]
         assert attrs["count"] == 1
@@ -620,7 +617,7 @@ class TestRecentlyOfflineSensor:
         )
         sensor.hass = mock_hass
         # Drive native_value to populate _cached_devices
-        sensor.native_value
+        _ = sensor.native_value
         cached_before = sensor._cached_devices
         # Poison the underlying data so a re-computation would return different results
         for d in mock_coordinator._device_states.values():
@@ -686,7 +683,7 @@ class TestRecentlyRecoveredSensor:
             mock_coordinator, "Test Group", "test_group", "test_entry_id"
         )
         sensor.hass = mock_hass
-        sensor.native_value
+        _ = sensor.native_value
         attrs = sensor.extra_state_attributes
         assert "binary_sensor.device_a" in attrs["entities"]
         assert attrs["count"] == 1
@@ -723,7 +720,7 @@ class TestRecentlyRecoveredSensor:
         )
         sensor.hass = mock_hass
         # Drive native_value to populate _cached_devices
-        sensor.native_value
+        _ = sensor.native_value
         cached_before = sensor._cached_devices
         # Poison the underlying data so a re-computation would return different results
         for d in mock_coordinator._device_states.values():
@@ -1386,8 +1383,8 @@ class TestAvailabilitySensorMinuteTruncation:
             return 100.0
 
         with patch.object(storage, "get_availability", side_effect=_capture):
-            sensor.native_value
-            sensor.extra_state_attributes
+            _ = sensor.native_value
+            _ = sensor.extra_state_attributes
 
         assert all(t.second == 0 and t.microsecond == 0 for t in captured)
         # Both calls land on the same truncated minute
@@ -1399,8 +1396,12 @@ class TestAvailabilitySensorMinuteTruncation:
 # ---------------------------------------------------------------------------
 
 
-from custom_components.entity_availability.sensor import _resolve_display_name  # noqa: E402
-from custom_components.entity_availability.const import CONF_USE_DEVICE_NAMES  # noqa: E402
+from custom_components.entity_availability.const import (
+    CONF_USE_DEVICE_NAMES,
+)
+from custom_components.entity_availability.sensor import (
+    _resolve_display_name,
+)
 
 
 class TestResolveDisplayName:
@@ -1959,7 +1960,7 @@ class TestAffectedAreasSensors:
                 mock_coordinator, "Test Group", "test_group", "test_entry_id"
             )
             sensor.hass = mock_hass
-            sensor.native_value  # populate cache
+            _ = sensor.native_value  # populate cache
             attrs = sensor.extra_state_attributes
         assert "binary_sensor.device_b" in attrs["unassigned_entities"]
         assert attrs["count"] == 1  # (No Area) sentinel appears in areas list
@@ -2059,7 +2060,7 @@ class TestAffectedAreasSensors:
                 mock_coordinator, "Test Group", "test_group", "test_entry_id"
             )
             sensor.hass = mock_hass
-            sensor.native_value
+            _ = sensor.native_value
             attrs = sensor.extra_state_attributes
         assert "window_minutes" in attrs
         assert attrs["count"] == 1
@@ -2181,7 +2182,7 @@ class TestAffectedAreasSensors:
                 mock_coordinator, "Test Group", "test_group", "test_entry_id"
             )
             sensor.hass = mock_hass
-            sensor.native_value
+            _ = sensor.native_value
             attrs = sensor.extra_state_attributes
         assert "window_minutes" in attrs
 

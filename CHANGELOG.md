@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- **Battery entity mapping re-added after being cleared** — battery entity fields that the user explicitly removed in the options flow were re-populated by auto-detection on every subsequent entry, and silently re-persisted on submit. The root cause was that cleared entries are stored as empty strings in `CONF_BATTERY_ENTITY_MAP`, making them indistinguishable from entities that were never configured; the code tested value truthiness (`if not default`) rather than key presence. The fix checks `if entity_id in existing_map` instead, so any key in the stored map — including those explicitly set to empty — is respected as-is. Newly added entities that are absent from the map still receive auto-detection suggestions.
+
 ## [0.3.13] - 2026-07-22
 
 ### Fixed

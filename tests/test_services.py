@@ -7,7 +7,6 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, patch
 
 import pytest
-
 from homeassistant.core import HomeAssistant
 
 from custom_components.entity_availability.const import DOMAIN
@@ -117,7 +116,7 @@ async def test_unsuppress_service(setup_services) -> None:
 
 async def test_suppress_entity_not_found_logs_warning(setup_services, caplog) -> None:
     """Test warning logged when entity not in any group."""
-    hass, coord = setup_services
+    hass, _ = setup_services
 
     with caplog.at_level(logging.WARNING):
         await hass.services.async_call(
@@ -132,7 +131,7 @@ async def test_suppress_entity_not_found_logs_warning(setup_services, caplog) ->
 
 async def test_unsuppress_entity_not_found_logs_warning(setup_services, caplog) -> None:
     """Test warning logged when unsuppressing unknown entity."""
-    hass, coord = setup_services
+    hass, _ = setup_services
 
     with caplog.at_level(logging.WARNING):
         await hass.services.async_call(
@@ -250,7 +249,7 @@ async def test_suppress_indefinitely_unknown_entity_logs_warning(
     setup_services, caplog
 ) -> None:
     """suppress_indefinitely logs a warning when entity is not in any group."""
-    hass, coord = setup_services
+    hass, _ = setup_services
 
     with caplog.at_level(logging.WARNING):
         await hass.services.async_call(
@@ -267,7 +266,7 @@ async def test_suppress_indefinitely_unknown_group_logs_warning(
     setup_services, caplog
 ) -> None:
     """suppress_indefinitely logs a warning when the group name is unknown."""
-    hass, coord = setup_services
+    hass, _ = setup_services
 
     with caplog.at_level(logging.WARNING):
         await hass.services.async_call(
@@ -284,7 +283,7 @@ async def test_suppress_indefinitely_no_args_logs_warning(
     setup_services, caplog
 ) -> None:
     """suppress_indefinitely logs a warning when neither entity_id nor group is provided."""
-    hass, coord = setup_services
+    hass, _ = setup_services
 
     with caplog.at_level(logging.WARNING):
         await hass.services.async_call(
@@ -340,7 +339,7 @@ async def test_suppress_service_unknown_group_logs_warning(
     setup_services, caplog
 ) -> None:
     """suppress service logs a warning when the group name is not found."""
-    hass, coord = setup_services
+    hass, _ = setup_services
 
     with caplog.at_level(logging.WARNING):
         await hass.services.async_call(
@@ -355,7 +354,7 @@ async def test_suppress_service_unknown_group_logs_warning(
 
 async def test_suppress_service_no_args_logs_warning(setup_services, caplog) -> None:
     """suppress service logs a warning when neither entity_id nor group is given."""
-    hass, coord = setup_services
+    hass, _ = setup_services
 
     with caplog.at_level(logging.WARNING):
         await hass.services.async_call(
@@ -396,7 +395,7 @@ async def test_unsuppress_service_unknown_group_logs_warning(
     setup_services, caplog
 ) -> None:
     """unsuppress service logs a warning when the group name is not found."""
-    hass, coord = setup_services
+    hass, _ = setup_services
 
     with caplog.at_level(logging.WARNING):
         await hass.services.async_call(
@@ -411,7 +410,7 @@ async def test_unsuppress_service_unknown_group_logs_warning(
 
 async def test_unsuppress_service_no_args_logs_warning(setup_services, caplog) -> None:
     """unsuppress service logs a warning when neither entity_id nor group is given."""
-    hass, coord = setup_services
+    hass, _ = setup_services
 
     with caplog.at_level(logging.WARNING):
         await hass.services.async_call(
@@ -433,7 +432,7 @@ async def test_suppress_skips_non_coordinator_values(setup_services) -> None:
     """Service entity loop skips non-coordinator values (e.g. _card_installed=True)."""
     hass, coord = setup_services
     # Reorder so non-coordinator value is iterated before the coordinator
-    entry_id = list(hass.data[DOMAIN].keys())[0]
+    entry_id = next(iter(hass.data[DOMAIN]))
     coord_ref = hass.data[DOMAIN].pop(entry_id)
     hass.data[DOMAIN]["_card_installed"] = True
     hass.data[DOMAIN][entry_id] = coord_ref
@@ -453,7 +452,7 @@ async def test_suppress_indefinitely_skips_non_coordinator_values(
 ) -> None:
     """suppress_indefinitely entity loop skips non-coordinator values."""
     hass, coord = setup_services
-    entry_id = list(hass.data[DOMAIN].keys())[0]
+    entry_id = next(iter(hass.data[DOMAIN]))
     coord_ref = hass.data[DOMAIN].pop(entry_id)
     hass.data[DOMAIN]["_card_installed"] = True
     hass.data[DOMAIN][entry_id] = coord_ref
@@ -472,7 +471,7 @@ async def test_suppress_indefinitely_skips_non_coordinator_values(
 async def test_unsuppress_skips_non_coordinator_values(setup_services) -> None:
     """unsuppress entity loop skips non-coordinator values."""
     hass, coord = setup_services
-    entry_id = list(hass.data[DOMAIN].keys())[0]
+    entry_id = next(iter(hass.data[DOMAIN]))
     coord_ref = hass.data[DOMAIN].pop(entry_id)
     hass.data[DOMAIN]["_card_installed"] = True
     hass.data[DOMAIN][entry_id] = coord_ref
@@ -494,7 +493,7 @@ async def test_unsuppress_skips_non_coordinator_values(setup_services) -> None:
 async def test_find_coordinator_skips_non_coordinator_values(setup_services) -> None:
     """_find_coordinator skips non-coordinator values in group lookup."""
     hass, coord = setup_services
-    entry_id = list(hass.data[DOMAIN].keys())[0]
+    entry_id = next(iter(hass.data[DOMAIN]))
     coord_ref = hass.data[DOMAIN].pop(entry_id)
     hass.data[DOMAIN]["_card_installed"] = True
     hass.data[DOMAIN][entry_id] = coord_ref
@@ -516,6 +515,7 @@ async def test_suppress_updates_all_coordinators_sharing_entity(
 ) -> None:
     """Suppress service calls suppress_entity on ALL coordinators that monitor the entity."""
     from pytest_homeassistant_custom_component.common import MockConfigEntry
+
     from custom_components.entity_availability.const import CONF_ENTITIES
 
     hass = mock_hass
@@ -616,7 +616,7 @@ async def test_reset_statistics_by_group(setup_services) -> None:
 
 async def test_reset_statistics_no_args(setup_services, caplog) -> None:
     """reset_statistics with neither entity_id nor group warns and no-ops."""
-    hass, coord = setup_services
+    hass, _ = setup_services
     with caplog.at_level(logging.WARNING):
         await hass.services.async_call(DOMAIN, "reset_statistics", {}, blocking=True)
     assert "Either entity_id or group" in caplog.text
@@ -624,7 +624,7 @@ async def test_reset_statistics_no_args(setup_services, caplog) -> None:
 
 async def test_reset_statistics_unknown_group(setup_services, caplog) -> None:
     """reset_statistics with unknown group warns."""
-    hass, coord = setup_services
+    hass, _ = setup_services
     with caplog.at_level(logging.WARNING):
         await hass.services.async_call(
             DOMAIN, "reset_statistics", {ATTR_GROUP: "Nope"}, blocking=True
@@ -634,7 +634,7 @@ async def test_reset_statistics_unknown_group(setup_services, caplog) -> None:
 
 async def test_reset_statistics_unknown_entity(setup_services, caplog) -> None:
     """reset_statistics with unmonitored entity warns."""
-    hass, coord = setup_services
+    hass, _ = setup_services
     with caplog.at_level(logging.WARNING):
         await hass.services.async_call(
             DOMAIN,

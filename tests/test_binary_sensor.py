@@ -5,9 +5,7 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, patch
 
 import pytest
-
 from homeassistant.core import HomeAssistant
-
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.entity_availability.binary_sensor import (
@@ -124,7 +122,7 @@ class TestAnyOfflineBinarySensor:
             mock_coordinator, "Test Group", "test_group", "test_entry_id"
         )
         sensor.hass = mock_hass
-        sensor.is_on
+        _ = sensor.is_on
         attrs = sensor.extra_state_attributes
         assert attrs["offline_count"] == 2
         assert "binary_sensor.device_a" in attrs["offline_entities"]
@@ -141,7 +139,7 @@ class TestAnyOfflineBinarySensor:
             mock_coordinator, "Test Group", "test_group", "test_entry_id"
         )
         sensor.hass = mock_hass
-        sensor.is_on
+        _ = sensor.is_on
         attrs = sensor.extra_state_attributes
         assert attrs["offline_count"] == 1
         assert "binary_sensor.device_a" not in attrs["offline_entities"]

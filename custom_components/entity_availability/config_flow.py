@@ -6,7 +6,6 @@ import logging
 from typing import Any
 
 import voluptuous as vol
-
 from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.config_entries import (
     ConfigEntry,
@@ -16,7 +15,8 @@ from homeassistant.config_entries import (
     OptionsFlow,
 )
 from homeassistant.core import callback
-from homeassistant.helpers import entity_registry as er, selector
+from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import selector
 
 from .const import (
     AVAILABLE_WINDOWS,
