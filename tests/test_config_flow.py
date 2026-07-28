@@ -1540,3 +1540,162 @@ async def test_options_flow_no_guessed_state_returns_empty(
 
     assert result["type"] == FlowResultType.FORM
     assert result["step_id"] == "battery_mapping"
+
+
+# ---------------------------------------------------------------------------
+# Regression tests: explicitly-cleared battery mapping must not be re-suggested
+# ---------------------------------------------------------------------------
+
+
+async def test_options_flow_cleared_mapping_stays_cleared(
+    hass: HomeAssistant,
+) -> None:
+    """Cleared battery mapping is not re-populated when options flow re-opens.
+
+    Regression test for: key present with '' in CONF_BATTERY_ENTITY_MAP must not
+    trigger auto-detection even when a battery entity would otherwise be guessed.
+    """
+    from custom_components.entity_availability.const import (
+        CONF_RECOVERY_WINDOW,
+        DEFAULT_RECOVERY_WINDOW,
+    )
+
+    # Entry whose battery map already has the entity key set to "" (explicitly cleared).
+    entry = MockConfigEntry(
+        version=1,
+        domain=DOMAIN,
+        title="Test",
+        data={
+            CONF_ENTRY_TYPE: ENTRY_TYPE_GROUP,
+            CONF_GROUP_NAME: "Test",
+            CONF_ENTITIES: ["binary_sensor.device_a"],
+            CONF_BAD_STATES: DEFAULT_BAD_STATES,
+            CONF_COOLDOWN: DEFAULT_COOLDOWN,
+            CONF_STALENESS_THRESHOLD: DEFAULT_STALENESS_THRESHOLD,
+            CONF_BATTERY_THRESHOLD: 20,
+            CONF_AVAILABILITY_WINDOWS: DEFAULT_AVAILABILITY_WINDOWS,
+            CONF_BATTERY_ENTITY_MAP: {"binary_sensor.device_a": ""},
+            CONF_RECOVERY_WINDOW: DEFAULT_RECOVERY_WINDOW,
+            CONF_USE_DEVICE_NAMES: False,
+        },
+        entry_id="test_cleared_map",
+    )
+    entry.add_to_hass(hass)
+
+    # Simulate that sensor.device_a_battery exists and would be auto-detected.
+    hass.states.async_set("sensor.device_a_battery", "50")
+
+    with patch(
+        "custom_components.entity_availability.async_setup_entry",
+        return_value=True,
+    ):
+        await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {
+            CONF_ENTITIES: ["binary_sensor.device_a"],
+            CONF_BAD_STATES: DEFAULT_BAD_STATES,
+            CONF_COOLDOWN: DEFAULT_COOLDOWN,
+            CONF_STALENESS_THRESHOLD: DEFAULT_STALENESS_THRESHOLD,
+            CONF_BATTERY_THRESHOLD: 20,
+            CONF_AVAILABILITY_WINDOWS: DEFAULT_AVAILABILITY_WINDOWS,
+        },
+    )
+
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "battery_mapping"
+
+    # The schema for device_a must NOT carry a suggested_value (the user cleared it).
+    schema = result["data_schema"]
+    for key in schema.schema:
+        if getattr(key, "schema", key) == "binary_sensor.device_a":
+            assert key.description is None or key.description.get("suggested_value", "") == ""
+            break
+
+    # Submit without filling in the field — the cleared mapping must be preserved.
+    with patch(
+        "custom_components.entity_availability.async_setup_entry",
+        return_value=True,
+    ):
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            {},  # no battery entity provided
+        )
+
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    assert entry.data[CONF_BATTERY_ENTITY_MAP] == {"binary_sensor.device_a": ""}
+
+
+async def test_options_flow_new_entity_still_gets_suggestion(
+    hass: HomeAssistant,
+) -> None:
+    """A newly added monitored entity (not a key in existing map) still gets auto-detected.
+
+    Regression test: the fix for cleared mappings must not suppress auto-detection
+    for entities that have never been configured.
+    """
+    from custom_components.entity_availability.const import (
+        CONF_RECOVERY_WINDOW,
+        DEFAULT_RECOVERY_WINDOW,
+    )
+
+    # Entry whose battery map only has device_a; device_b is new (not in map).
+    entry = MockConfigEntry(
+        version=1,
+        domain=DOMAIN,
+        title="Test",
+        data={
+            CONF_ENTRY_TYPE: ENTRY_TYPE_GROUP,
+            CONF_GROUP_NAME: "Test",
+            CONF_ENTITIES: ["binary_sensor.device_a", "binary_sensor.device_b"],
+            CONF_BAD_STATES: DEFAULT_BAD_STATES,
+            CONF_COOLDOWN: DEFAULT_COOLDOWN,
+            CONF_STALENESS_THRESHOLD: DEFAULT_STALENESS_THRESHOLD,
+            CONF_BATTERY_THRESHOLD: 20,
+            CONF_AVAILABILITY_WINDOWS: DEFAULT_AVAILABILITY_WINDOWS,
+            CONF_BATTERY_ENTITY_MAP: {"binary_sensor.device_a": "sensor.device_a_battery"},
+            CONF_RECOVERY_WINDOW: DEFAULT_RECOVERY_WINDOW,
+            CONF_USE_DEVICE_NAMES: False,
+        },
+        entry_id="test_new_entity_suggestion",
+    )
+    entry.add_to_hass(hass)
+
+    # device_b_battery exists in state — should be auto-detected for device_b.
+    hass.states.async_set("sensor.device_b_battery", "42")
+
+    with patch(
+        "custom_components.entity_availability.async_setup_entry",
+        return_value=True,
+    ):
+        await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {
+            CONF_ENTITIES: ["binary_sensor.device_a", "binary_sensor.device_b"],
+            CONF_BAD_STATES: DEFAULT_BAD_STATES,
+            CONF_COOLDOWN: DEFAULT_COOLDOWN,
+            CONF_STALENESS_THRESHOLD: DEFAULT_STALENESS_THRESHOLD,
+            CONF_BATTERY_THRESHOLD: 20,
+            CONF_AVAILABILITY_WINDOWS: DEFAULT_AVAILABILITY_WINDOWS,
+        },
+    )
+
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "battery_mapping"
+
+    # device_b (not in existing map) should have a suggested_value from auto-detection.
+    schema = result["data_schema"]
+    device_b_suggestion = None
+    for key in schema.schema:
+        if getattr(key, "schema", key) == "binary_sensor.device_b":
+            device_b_suggestion = (key.description or {}).get("suggested_value")
+            break
+
+    assert device_b_suggestion == "sensor.device_b_battery"
