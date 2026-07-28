@@ -1,0 +1,10 @@
+# Ruff configuration for the Entity Availability integration.
+#
+# The rule selection is pinned explicitly so that lint results stay stable when
+# ruff changes its built-in defaults between releases.
+
+target-version = "py312"
+line-length = 88
+
+[lint]
+select = ["E4", "E7", "E9", "F"]
